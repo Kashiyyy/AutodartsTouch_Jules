@@ -60,7 +60,7 @@ download_file() {
 # 0) Basic system packages (best-effort)
 # -------------------------
 apt update
-apt install -y curl build-essential jq dos2unix || true
+apt install -y curl build-essential || true
 
 # -------------------------
 # 1) Node.js (best-effort)
@@ -115,21 +115,17 @@ chown "$GUI_USER:$GUI_USER" "$APP_DIR/keyboard"
 download_file "$GITHUB_RAW_URL/keyboard/index.html" "$APP_DIR/keyboard/index.html"
 
 # -------------------------
-# 6) Download supporting scripts
+# 6) Download start script
 # -------------------------
-download_file "$GITHUB_RAW_URL/keyboard-server.js" "$APP_DIR/keyboard-server.js"
 download_file "$GITHUB_RAW_URL/start_kiosk.sh" "$START_SCRIPT"
 chmod 755 "$START_SCRIPT" # Make start script executable
 
 # -------------------------
-# 7) Autostart (LXDE + .desktop + crontab)
+# 7) Autostart Configuration
 # -------------------------
+# Use a .desktop file for reliable startup with the GUI. This is the
+# standard and most reliable method for GUI applications.
 echo ">>> Setting up autostart..."
-mkdir -p "$AUTOSTART_LXDIR"
-echo "@bash $START_SCRIPT" > "$AUTOSTART_FILE"
-chown "$GUI_USER:$GUI_USER" "$AUTOSTART_FILE"
-chmod 644 "$AUTOSTART_FILE"
-
 mkdir -p "$AUTOSTART_DESKTOP_DIR"
 cat > "$DESKTOP_FILE" <<DESK
 [Desktop Entry]
@@ -141,15 +137,6 @@ X-GNOME-Autostart-enabled=true
 DESK
 chown "$GUI_USER:$GUI_USER" "$DESKTOP_FILE"
 chmod 644 "$DESKTOP_FILE"
-
-CRON_LINE="@reboot bash $START_SCRIPT"
-EXISTING_CRON="$(crontab -u "$GUI_USER" -l 2>/dev/null || true)"
-if echo "$EXISTING_CRON" | grep -Fxq "$CRON_LINE"; then
-  echo "Crontab entry already exists."
-else
-  ( printf "%s\n" "$EXISTING_CRON" | sed '/^\s*$/d' ; echo "$CRON_LINE" ) | crontab -u "$GUI_USER" -
-  echo "Crontab @reboot set for $GUI_USER."
-fi
 
 # -------------------------
 # 8) Final ownership / perms
