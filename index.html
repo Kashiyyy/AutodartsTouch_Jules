@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Kiosk Toolbar</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;height:100%;background:transparent;font-family:'Open Sans',sans-serif}
+#toolbar{
+  position:fixed; top:0; left:0; right:0; height:72px;
+  display:grid; grid-template-columns:80px 1fr 80px 80px; align-items:center; padding:0 12px; z-index:99999;
+  background-image:
+    radial-gradient(50% 30% at 86% 0%, #313370e3, #40348600),
+    radial-gradient(50% 70% at 70% 22%, #26599ae6, #40348600),
+    radial-gradient(50% 70% at 112% 44%, #2c436cd9, #40348600),
+    radial-gradient(90% 90% at -12% 89%, #0f2f50e0, #40348600),
+    radial-gradient(50% 70% at -2% 53%, #34205fe3, #40348600),
+    radial-gradient(50% 70% at 36% 22%, #403486d4, #40348600),
+    radial-gradient(50% 40% at 66% 59%, #206fb9de 7%, #206fb900),
+    radial-gradient(75% 75% at 50% 50%, #3662b9 1%, #2d285b);
+  background-repeat:no-repeat;background-size:cover;
+}
+button{font-family:'Open Sans',sans-serif;font-size:20px;padding:0 12px;border:none;background:none;color:#fff;cursor:pointer}
+button:hover{color:#e0e0e0}
+#tabs{display:flex;justify-content:space-evenly;gap:16px;align-items:center;height:100%}
+.sidebtn{width:56px;height:56px;background:transparent;color:#fff;font-size:24px;border:none;padding:0}
+button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 auto;width:66%;height:2px;background:#fff;border-radius:1px}
+</style>
+</head>
+<body>
+  <div id="toolbar" role="toolbar" aria-label="Kiosk Steuerung">
+    <div style="display:flex;align-items:center;justify-content:center;">
+      <button class="sidebtn" id="webVKBtn" aria-label="Web-Tastatur">&#x2328;</button>
+    </div>
+
+    <div id="tabs" role="tablist" aria-label="Seiten">
+      <button onclick="api.switchTab('tab1')" role="tab" aria-selected="true" id="tab1btn">Seite 1</button>
+      <button onclick="api.switchTab('tab2')" role="tab" aria-selected="false" id="tab2btn">Seite 2</button>
+    </div>
+
+    <div style="display:flex;align-items:center;justify-content:center;">
+      <button class="sidebtn" onclick="api.refresh()" aria-label="Aktualisieren">&#x27F3;</button>
+    </div>
+
+    <div style="display:flex;align-items:center;justify-content:center;">
+      <button class="sidebtn" onclick="api.toggleSettings()" aria-label="Einstellungen">&#x2699;</button>
+    </div>
+  </div>
+
+<script>
+  const tabs = [document.getElementById('tab1btn'), document.getElementById('tab2btn')];
+  function setActive(id){ tabs.forEach(t => t.setAttribute('aria-selected', t.id === id+'btn' ? 'true' : 'false')); }
+  setActive('tab1');
+  function switchTab(id){ setActive(id); if(window.api && window.api.switchTab) window.api.switchTab(id); }
+
+  const webVKBtn = document.getElementById('webVKBtn');
+  webVKBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); if(window.api && window.api.toggleWebKeyboard) window.api.toggleWebKeyboard(); });
+  webVKBtn.addEventListener('click', (e) => e.preventDefault());
+</script>
+</body>
+</html>

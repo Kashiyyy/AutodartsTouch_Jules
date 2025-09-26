@@ -1,0 +1,596 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+  <title>Multi-Language Keyboard</title>
+  <style>
+    * {
+      -webkit-tap-highlight-color: transparent;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: #000000;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      color: #ffffff;
+      overflow: hidden;
+    }
+
+    #keyboard {
+      background: #1c1c1e;
+      border-radius: 0;
+      padding: 8px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .hg-row {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 6px;
+      gap: 4px;
+    }
+
+    .hg-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .hg-button {
+      background: #323234;
+      color: #ffffff;
+      border: none;
+      border-radius: 8px;
+      transition: all 0.1s ease;
+      font-weight: 400;
+      font-size: 18px;
+      height: 46px;
+      min-width: 32px;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      touch-action: manipulation;
+      font-family: inherit;
+    }
+
+    .hg-button[data-skbtn="{shift}"],
+    .hg-button[data-skbtn="{bksp}"] {
+      background: #525254;
+      flex: 1.5;
+      font-size: 16px;
+    }
+
+    .hg-button[data-skbtn="{space}"] {
+      flex: 5;
+      background: #323234;
+      font-size: 14px;
+    }
+
+    .hg-button[data-skbtn="123"],
+    .hg-button[data-skbtn="ABC"],
+    .hg-button[data-skbtn="{symbols}"],
+    .hg-button[data-skbtn="{numbers}"] {
+      background: #525254;
+      flex: 1.5;
+      font-size: 14px;
+    }
+
+    .hg-button[data-skbtn="return"] {
+      background: #0066cc;
+      flex: 1.5;
+      font-size: 14px;
+      color: #ffffff;
+    }
+
+    .hg-button:active {
+      background: #404042;
+      transform: scale(0.95);
+    }
+
+    .hg-button.hg-activeButton {
+      background: #0066cc;
+      color: #ffffff;
+      box-shadow: 0 0 10px rgba(0, 102, 204, 0.3);
+    }
+
+    .hg-button[data-skbtn="{shift}"]:active,
+    .hg-button[data-skbtn="{bksp}"]:active,
+    .hg-button[data-skbtn="123"]:active,
+    .hg-button[data-skbtn="ABC"]:active {
+      background: #606062;
+    }
+
+    .hg-button[data-skbtn="return"]:active {
+      background: #0077dd;
+    }
+
+    /* Umlaut popup styling */
+    .umlaut-popup {
+      position: fixed;
+      background: #48484a;
+      border-radius: 8px;
+      padding: 8px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+      z-index: 2000;
+      display: flex;
+      gap: 6px;
+      border: 1px solid #5a5a5c;
+      animation: popupAppear 0.15s ease-out;
+      pointer-events: auto;
+      outline: none;
+    }
+
+    .umlaut-popup::before {
+      content: '';
+      position: absolute;
+      bottom: -6px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 6px solid transparent;
+      border-right: 6px solid transparent;
+      border-top: 6px solid #48484a;
+    }
+
+    .umlaut-option {
+      background: #323234;
+      color: #ffffff;
+      border: none;
+      border-radius: 6px;
+      width: 45px;
+      height: 45px;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.1s ease;
+      touch-action: manipulation;
+      outline: none;
+      font-family: inherit;
+    }
+
+    .umlaut-option:hover,
+    .umlaut-option.selected {
+      background: #0066cc;
+      transform: scale(1.1);
+      box-shadow: 0 2px 8px rgba(0, 102, 204, 0.3);
+    }
+
+    .umlaut-option:active {
+      transform: scale(1.05);
+      background: #0077dd;
+    }
+
+    @keyframes popupAppear {
+      0% {
+        opacity: 0;
+        transform: scale(0.8) translateY(10px);
+      }
+      100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 480px) {
+      .hg-button {
+        height: 42px;
+        font-size: 16px;
+        min-width: 28px;
+      }
+
+      .hg-row {
+        gap: 3px;
+        margin-bottom: 5px;
+      }
+    }
+
+    @media (max-width: 360px) {
+      .hg-button {
+        height: 38px;
+        font-size: 15px;
+        min-width: 26px;
+      }
+
+      .hg-row {
+        gap: 2px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="keyboard"></div>
+
+  <script>
+    let keyboardElement = document.getElementById('keyboard');
+    let currentLayout = 'default';
+    let shiftActive = false;
+    let popupElement = null;
+    let globalClickDisabled = false;
+    let currentLanguage = 'de';
+
+    // --- KEYBOARD LAYOUTS ---
+    const allLayouts = {
+      // German (DE) Layouts
+      de: {
+        default: [
+          ['q', 'w', 'e', 'r', 't', 'z', 'u', 'i', 'o', 'p'],
+          ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l'],
+          ['{shift}', 'y', 'x', 'c', 'v', 'b', 'n', 'm', '{bksp}'],
+          ['123', ',', '{space}', '.', 'return']
+        ],
+        shift: [
+          ['Q', 'W', 'E', 'R', 'T', 'Z', 'U', 'I', 'O', 'P'],
+          ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
+          ['{shift}', 'Y', 'X', 'C', 'V', 'B', 'N', 'M', '{bksp}'],
+          ['123', ',', '{space}', '.', 'return']
+        ],
+        numbers: [
+          ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
+          [
+            '\u002D', // -
+            '\u002F', // /
+            '\u003A', // :
+            '\u003B', // ;
+            '\u0028', // (
+            '\u0029', // )
+            '\u20AC', // €
+            '\u0026', // &
+            '\u0040', // @
+            '\u0022'  // "
+          ],
+          ['{symbols}', '.', ',', '\u003F', '\u0021', '\u0027', '\u00DF', '{bksp}'], // ? ! ' ß
+          ['ABC', '\u00E4', '{space}', '\u00F6', 'return'] // ä ö
+        ],
+        symbols: [
+          [
+            '\u005B', // [
+            '\u005D', // ]
+            '\u007B', // {
+            '\u007D', // }
+            '\u0023', // #
+            '\u0025', // %
+            '\u005E', // ^
+            '\u002A', // *
+            '\u002B', // +
+            '\u003D'  // =
+          ],
+          [
+            '\u005F', // _
+            '\u005C', // \
+            '\u007C', // |
+            '\u007E', // ~
+            '\u003C', // <
+            '\u003E', // >
+            '\u0024', // $
+            '\u00A3', // £
+            '\u00A5', // ¥
+            '\u2022'  // •
+          ],
+          ['{numbers}', '.', ',', '\u003F', '\u0021', '\u0027', '\u00FC', '{bksp}'], // ? ! ' ü
+          ['ABC', '\u00E4', '{space}', '\u00F6', 'return'] // ä ö
+        ]
+      },
+      // English (US) Layouts
+      en: {
+        default: [
+          ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'],
+          ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l'],
+          ['{shift}', 'z', 'x', 'c', 'v', 'b', 'n', 'm', '{bksp}'],
+          ['123', ',', '{space}', '.', 'return']
+        ],
+        shift: [
+          ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
+          ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
+          ['{shift}', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', '{bksp}'],
+          ['123', ',', '{space}', '.', 'return']
+        ],
+        numbers: [
+          ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
+          [
+            '\u002D', // -
+            '\u002F', // /
+            '\u003A', // :
+            '\u003B', // ;
+            '\u0028', // (
+            '\u0029', // )
+            '\u0024', // $
+            '\u0026', // &
+            '\u0040', // @
+            '\u0022'  // "
+          ],
+          ['{symbols}', '.', ',', '\u003F', '\u0021', '\u0027', '{bksp}'], // ? ! '
+          ['ABC', '{space}', '.', 'return']
+        ],
+        symbols: [
+          [
+            '\u005B', // [
+            '\u005D', // ]
+            '\u007B', // {
+            '\u007D', // }
+            '\u0023', // #
+            '\u0025', // %
+            '\u005E', // ^
+            '\u002A', // *
+            '\u002B', // +
+            '\u003D'  // =
+          ],
+          [
+            '\u005F', // _
+            '\u005C', // \
+            '\u007C', // |
+            '\u007E', // ~
+            '\u003C', // <
+            '\u003E', // >
+            '\u0024', // $
+            '\u00A3', // £
+            '\u00A5', // ¥
+            '\u2022'  // •
+          ],
+          ['{numbers}', '.', ',', '\u003F', '\u0021', '\u0027', '{bksp}'], // ? ! '
+          ['ABC', '{space}', '.', 'return']
+        ]
+      }
+    };
+
+    // Umlaut mappings for long press (only for German)
+    const umlautMappings = {
+      'a': ['\u00E4', '\u00E0', '\u00E1', '\u00E2', '\u00E3', '\u00E5'], 'A': ['\u00C4', '\u00C0', '\u00C1', '\u00C2', '\u00C3', '\u00C5'],
+      'o': ['\u00F6', '\u00F2', '\u00F3', '\u00F4', '\u00F5', '\u00F8'], 'O': ['\u00D6', '\u00D2', '\u00D3', '\u00D4', '\u00D5', '\u00D8'],
+      'u': ['\u00FC', '\u00F9', '\u00FA', '\u00FB', '\u0169'], 'U': ['\u00DC', '\u00D9', '\u00DA', '\u00DB', '\u0168'],
+      'e': ['\u00E9', '\u00E8', '\u00EA', '\u00EB', '\u0113'], 'E': ['\u00C9', '\u00C8', '\u00CA', '\u00CB', '\u0112'],
+      's': ['\u00DF', '\u0161', '\u015B'], 'S': ['\u0160', '\u015A'],
+      'n': ['\u00F1', '\u0144'], 'N': ['\u00D1', '\u0143'], 'c': ['\u00E7', '\u0107', '\u010D'], 'C': ['\u00C7', '\u0106', '\u010C'],
+      'i': ['\u00ED', '\u00EC', '\u00EE', '\u00EF', '\u012B'], 'I': ['\u00CD', '\u00CC', '\u00CE', '\u00CF', '\u012A'],
+      'y': ['\u00FD', '\u1EF3', '\u0177', '\u00FF'], 'Y': ['\u00DD', '\u1EF2', '\u0176', '\u0178']
+    };
+
+    function createKeyboard() {
+      function renderKeyboard() {
+        keyboardElement.innerHTML = '';
+
+        const currentLayoutSet = allLayouts[currentLanguage] || allLayouts.de;
+        const layout = currentLayoutSet[currentLayout] || currentLayoutSet.default;
+
+        layout.forEach((row) => {
+          const rowDiv = document.createElement('div');
+          rowDiv.className = 'hg-row';
+
+          row.forEach(key => {
+            const button = document.createElement('button');
+            button.className = 'hg-button';
+            button.setAttribute('data-skbtn', key);
+
+            let displayText = key;
+            if (key === '{shift}') displayText = '\u21E7'; // ⇧
+            else if (key === '{bksp}') displayText = '\u232B'; // ⌫
+            else if (key === '{space}') displayText = '';
+            else if (key === 'return') displayText = '\u21B5'; // ↵
+            else if (key === '{symbols}') displayText = '#+=';
+            else if (key === '{numbers}') displayText = '123';
+
+            button.textContent = displayText;
+
+            if (key === '{shift}' && shiftActive) {
+              button.classList.add('hg-activeButton');
+            }
+
+            setupButtonEvents(button, key);
+            rowDiv.appendChild(button);
+          });
+
+          keyboardElement.appendChild(rowDiv);
+        });
+
+        setTimeout(() => {
+          reportKeyboardHeight();
+        }, 50);
+      }
+
+      function setupButtonEvents(button, key) {
+        // Long press for umlauts, only for German layout
+        if (currentLanguage === 'de' && umlautMappings[key] && !key.startsWith('{')) {
+          let longPressTimer = null;
+          let longPressTriggered = false;
+
+          const startPress = (e) => {
+            longPressTriggered = false;
+            longPressTimer = setTimeout(() => {
+              longPressTriggered = true;
+              showUmlautPopup(button, key);
+              e.preventDefault(); e.stopPropagation();
+            }, 500);
+          };
+
+          const endPress = (e) => {
+            if (longPressTimer) clearTimeout(longPressTimer);
+            if (longPressTriggered) {
+              e.preventDefault(); e.stopPropagation();
+              const touch = e.changedTouches ? e.changedTouches[0] : e;
+              const elementUnderPointer = document.elementFromPoint(touch.clientX, touch.clientY);
+              const umlautOption = elementUnderPointer?.closest('.umlaut-option');
+              if (umlautOption) {
+                sendKey(umlautOption.textContent);
+                hideUmlautPopup();
+              }
+              longPressTriggered = false;
+              return false;
+            }
+          };
+
+          button.onmousedown = startPress;
+          button.onmouseup = endPress;
+          button.ontouchstart = startPress;
+          button.ontouchend = endPress;
+
+          button.onclick = (e) => {
+            if (longPressTriggered) {
+              e.preventDefault(); e.stopPropagation();
+              return false;
+            }
+            handleKeyPress(key);
+          };
+        } else {
+          button.onclick = () => handleKeyPress(key);
+        }
+      }
+
+      function handleKeyPress(key) {
+        if (key === '{shift}') {
+          shiftActive = !shiftActive;
+          currentLayout = shiftActive ? 'shift' : 'default';
+          renderKeyboard();
+          sendKey('{shift}');
+        }
+        else if (key === '123' || key === '{numbers}') {
+          currentLayout = 'numbers';
+          shiftActive = false;
+          renderKeyboard();
+        }
+        else if (key === 'ABC') {
+          currentLayout = shiftActive ? 'shift' : 'default';
+          renderKeyboard();
+        }
+        else if (key === '{symbols}') {
+          currentLayout = 'symbols';
+          renderKeyboard();
+        }
+        else if (key === 'return') {
+          sendKey('{enter}');
+        }
+        else if (key === '{space}') {
+          sendKey(' ');
+        }
+        else if (key === '{bksp}') {
+          sendKey('{bksp}');
+        }
+        else {
+          sendKey(key);
+          if (shiftActive && currentLayout === 'shift') {
+            shiftActive = false;
+            currentLayout = 'default';
+            setTimeout(renderKeyboard, 100);
+          }
+        }
+      }
+
+      renderKeyboard();
+      return { handleKeyPress, renderKeyboard };
+    }
+
+    function showUmlautPopup(button, character) {
+      const umlauts = umlautMappings[character];
+      if (!umlauts || umlauts.length === 0) return;
+
+      hideUmlautPopup();
+      popupElement = document.createElement('div');
+      popupElement.className = 'umlaut-popup';
+
+      umlauts.forEach(umlaut => {
+        const option = document.createElement('button');
+        option.className = 'umlaut-option';
+        option.textContent = umlaut;
+
+        const selectUmlaut = (e) => {
+          e.preventDefault(); e.stopPropagation();
+          sendKey(umlaut);
+          hideUmlautPopup();
+        };
+
+        option.onclick = selectUmlaut;
+        option.onmousedown = selectUmlaut;
+        option.ontouchend = selectUmlaut;
+
+        popupElement.appendChild(option);
+      });
+
+      popupElement.onclick = (e) => e.stopPropagation();
+      document.body.appendChild(popupElement);
+
+      const buttonRect = button.getBoundingClientRect();
+      const popupRect = popupElement.getBoundingClientRect();
+      const left = buttonRect.left + (buttonRect.width / 2) - (popupRect.width / 2);
+      const top = buttonRect.top - popupRect.height - 12;
+
+      popupElement.style.left = Math.max(8, Math.min(left, window.innerWidth - popupRect.width - 8)) + 'px';
+      popupElement.style.top = Math.max(8, top) + 'px';
+
+      if (navigator.vibrate) navigator.vibrate(50);
+    }
+
+    function hideUmlautPopup() {
+      if (popupElement) {
+        popupElement.remove();
+        popupElement = null;
+      }
+    }
+
+    function sendKey(key) {
+      if (window.api && window.api.sendKey) {
+        try { window.api.sendKey(key); } catch (e) { console.error('Error sending key:', e); }
+      }
+    }
+
+    function reportKeyboardHeight() {
+      const keyboardEl = document.getElementById('keyboard');
+      if (keyboardEl && window.api && window.api.reportKeyboardHeight) {
+        keyboardEl.offsetHeight; // Force reflow
+        window.api.reportKeyboardHeight(keyboardEl.offsetHeight);
+      }
+    }
+
+    function resetKeyboardToDefault() {
+      currentLayout = 'default';
+      shiftActive = false;
+    }
+
+    // --- GLOBAL EVENT HANDLERS & INITIALIZATION ---
+    document.addEventListener('click', (e) => {
+      if (popupElement && !e.target.closest('.umlaut-popup')) {
+        hideUmlautPopup();
+      }
+    });
+
+    const keyboardInstance = createKeyboard();
+
+    window.addEventListener('resize', () => {
+        hideUmlautPopup();
+        setTimeout(reportKeyboardHeight, 100);
+    });
+    window.addEventListener('blur', hideUmlautPopup);
+
+    window.showKeyboard = () => {
+      resetKeyboardToDefault();
+      if (keyboardInstance) keyboardInstance.renderKeyboard();
+      setTimeout(reportKeyboardHeight, 50);
+    };
+
+    // Listen for language change command from main process
+    if (window.api && window.api.onKeyboardLanguageChanged) {
+        window.api.onKeyboardLanguageChanged((lang) => {
+            if (allLayouts[lang]) {
+                currentLanguage = lang;
+                currentLayout = 'default';
+                shiftActive = false;
+                if (keyboardInstance) {
+                    keyboardInstance.renderKeyboard();
+                }
+            }
+        });
+    }
+
+
+    // Report initial height
+    setTimeout(reportKeyboardHeight, 100);
+  </script>
+</body>
+</html>

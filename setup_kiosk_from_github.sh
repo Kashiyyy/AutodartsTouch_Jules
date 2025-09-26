@@ -60,7 +60,7 @@ download_file() {
 # 0) Basic system packages (best-effort)
 # -------------------------
 apt update
-apt install -y curl build-essential || true
+apt install -y curl build-essential alsa-utils || true
 
 # -------------------------
 # 1) Node.js (best-effort)
