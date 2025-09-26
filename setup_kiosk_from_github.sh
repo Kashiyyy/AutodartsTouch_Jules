@@ -19,10 +19,18 @@ set -euo pipefail
 # -------------------------
 # CONFIGURATION
 # -------------------------
-# !!! IMPORTANT !!! - This script is configured for the specified repository.
+# This script can be run for a specific branch by passing the branch name as an argument.
+# e.g., sudo bash setup_kiosk_from_github.sh my-feature-branch
+# Defaults to 'main' if no branch is specified.
+
+# Repository URL
 GITHUB_REPO_URL="https://github.com/Kashiyyy/AutodartsTouch_Jules"
-# Base URL for raw file content (usually no need to change this)
-GITHUB_RAW_URL="${GITHUB_REPO_URL/github.com/raw.githubusercontent.com}/main"
+
+# Determine branch to use from the first script argument, default to 'main'
+BRANCH_NAME="${1:-main}"
+
+# Base URL for raw file content
+GITHUB_RAW_URL="${GITHUB_REPO_URL/github.com/raw.githubusercontent.com}/${BRANCH_NAME}"
 
 
 # -------------------------
@@ -40,6 +48,7 @@ DESKTOP_FILE="$AUTOSTART_DESKTOP_DIR/kiosk-electron.desktop"
 echo ">>> Setup starting for GUI-User: $GUI_USER"
 echo ">>> Home: $HOME_DIR"
 echo ">>> App-Folder: $APP_DIR"
+echo ">>> Installing from branch: ${BRANCH_NAME}"
 echo ">>> Downloading from: $GITHUB_RAW_URL"
 echo
 
