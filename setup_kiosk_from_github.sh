@@ -100,7 +100,7 @@ mkdir -p "$APP_DIR"
 chown -R "$GUI_USER:$GUI_USER" "$APP_DIR"
 
 # Download package.json first to install dependencies
-download_file "$GITHUB_RAW_URL/package.json" "$APP_DIR/package.json"
+download_file "$GITHUB_RAW_URL/kiosk-electron/package.json" "$APP_DIR/package.json"
 
 # -------------------------
 # 3) Install npm dependencies
@@ -112,9 +112,9 @@ echo ">>> npm install complete."
 # -------------------------
 # 4) Download core application files
 # -------------------------
-download_file "$GITHUB_RAW_URL/main.js" "$APP_DIR/main.js"
-download_file "$GITHUB_RAW_URL/preload.js" "$APP_DIR/preload.js"
-download_file "$GITHUB_RAW_URL/index.html" "$APP_DIR/index.html"
+download_file "$GITHUB_RAW_URL/kiosk-electron/main.js" "$APP_DIR/main.js"
+download_file "$GITHUB_RAW_URL/kiosk-electron/preload.js" "$APP_DIR/preload.js"
+download_file "$GITHUB_RAW_URL/kiosk-electron/index.html" "$APP_DIR/index.html"
 
 # -------------------------
 # 5) Download keyboard files
@@ -126,7 +126,7 @@ download_file "$GITHUB_RAW_URL/keyboard/index.html" "$APP_DIR/keyboard/index.htm
 # -------------------------
 # 6) Download start script
 # -------------------------
-download_file "$GITHUB_RAW_URL/start_kiosk.sh" "$START_SCRIPT"
+download_file "$GITHUB_RAW_URL/kiosk-electron/start_kiosk.sh" "$START_SCRIPT"
 chmod 755 "$START_SCRIPT" # Make start script executable
 
 # -------------------------
