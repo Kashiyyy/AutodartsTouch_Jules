@@ -19,10 +19,18 @@ set -euo pipefail
 # -------------------------
 # CONFIGURATION
 # -------------------------
-# !!! IMPORTANT !!! - This script is configured for the specified repository.
+# This script can be run for a specific branch by passing the branch name as an argument.
+# e.g., sudo bash setup_kiosk_from_github.sh my-feature-branch
+# Defaults to 'main' if no branch is specified.
+
+# Repository URL
 GITHUB_REPO_URL="https://github.com/Kashiyyy/AutodartsTouch_Jules"
-# Base URL for raw file content (usually no need to change this)
-GITHUB_RAW_URL="${GITHUB_REPO_URL/github.com/raw.githubusercontent.com}/main"
+
+# Determine branch to use from the first script argument, default to 'main'
+BRANCH_NAME="${1:-main}"
+
+# Base URL for raw file content
+GITHUB_RAW_URL="${GITHUB_REPO_URL/github.com/raw.githubusercontent.com}/${BRANCH_NAME}"
 
 
 # -------------------------
@@ -40,6 +48,7 @@ DESKTOP_FILE="$AUTOSTART_DESKTOP_DIR/kiosk-electron.desktop"
 echo ">>> Setup starting for GUI-User: $GUI_USER"
 echo ">>> Home: $HOME_DIR"
 echo ">>> App-Folder: $APP_DIR"
+echo ">>> Installing from branch: ${BRANCH_NAME}"
 echo ">>> Downloading from: $GITHUB_RAW_URL"
 echo
 
@@ -60,7 +69,7 @@ download_file() {
 # 0) Basic system packages (best-effort)
 # -------------------------
 apt update
-apt install -y curl build-essential jq dos2unix || true
+apt install -y curl build-essential alsa-utils || true
 
 # -------------------------
 # 1) Node.js (best-effort)
@@ -91,7 +100,7 @@ mkdir -p "$APP_DIR"
 chown -R "$GUI_USER:$GUI_USER" "$APP_DIR"
 
 # Download package.json first to install dependencies
-download_file "$GITHUB_RAW_URL/package.json" "$APP_DIR/package.json"
+download_file "$GITHUB_RAW_URL/kiosk-electron/package.json" "$APP_DIR/package.json"
 
 # -------------------------
 # 3) Install npm dependencies
@@ -103,9 +112,9 @@ echo ">>> npm install complete."
 # -------------------------
 # 4) Download core application files
 # -------------------------
-download_file "$GITHUB_RAW_URL/main.js" "$APP_DIR/main.js"
-download_file "$GITHUB_RAW_URL/preload.js" "$APP_DIR/preload.js"
-download_file "$GITHUB_RAW_URL/index.html" "$APP_DIR/index.html"
+download_file "$GITHUB_RAW_URL/kiosk-electron/main.js" "$APP_DIR/main.js"
+download_file "$GITHUB_RAW_URL/kiosk-electron/preload.js" "$APP_DIR/preload.js"
+download_file "$GITHUB_RAW_URL/kiosk-electron/index.html" "$APP_DIR/index.html"
 
 # -------------------------
 # 5) Download keyboard files
@@ -115,21 +124,17 @@ chown "$GUI_USER:$GUI_USER" "$APP_DIR/keyboard"
 download_file "$GITHUB_RAW_URL/keyboard/index.html" "$APP_DIR/keyboard/index.html"
 
 # -------------------------
-# 6) Download supporting scripts
+# 6) Download start script
 # -------------------------
-download_file "$GITHUB_RAW_URL/keyboard-server.js" "$APP_DIR/keyboard-server.js"
-download_file "$GITHUB_RAW_URL/start_kiosk.sh" "$START_SCRIPT"
+download_file "$GITHUB_RAW_URL/kiosk-electron/start_kiosk.sh" "$START_SCRIPT"
 chmod 755 "$START_SCRIPT" # Make start script executable
 
 # -------------------------
-# 7) Autostart (LXDE + .desktop + crontab)
+# 7) Autostart Configuration
 # -------------------------
+# Use a .desktop file for reliable startup with the GUI. This is the
+# standard and most reliable method for GUI applications.
 echo ">>> Setting up autostart..."
-mkdir -p "$AUTOSTART_LXDIR"
-echo "@bash $START_SCRIPT" > "$AUTOSTART_FILE"
-chown "$GUI_USER:$GUI_USER" "$AUTOSTART_FILE"
-chmod 644 "$AUTOSTART_FILE"
-
 mkdir -p "$AUTOSTART_DESKTOP_DIR"
 cat > "$DESKTOP_FILE" <<DESK
 [Desktop Entry]
@@ -141,15 +146,6 @@ X-GNOME-Autostart-enabled=true
 DESK
 chown "$GUI_USER:$GUI_USER" "$DESKTOP_FILE"
 chmod 644 "$DESKTOP_FILE"
-
-CRON_LINE="@reboot bash $START_SCRIPT"
-EXISTING_CRON="$(crontab -u "$GUI_USER" -l 2>/dev/null || true)"
-if echo "$EXISTING_CRON" | grep -Fxq "$CRON_LINE"; then
-  echo "Crontab entry already exists."
-else
-  ( printf "%s\n" "$EXISTING_CRON" | sed '/^\s*$/d' ; echo "$CRON_LINE" ) | crontab -u "$GUI_USER" -
-  echo "Crontab @reboot set for $GUI_USER."
-fi
 
 # -------------------------
 # 8) Final ownership / perms

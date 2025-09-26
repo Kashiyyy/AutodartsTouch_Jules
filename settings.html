@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Einstellungen</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <style>
+        :root {
+            --bg-color: #1c1c1e;
+            --item-bg-color: #323234;
+            --text-color: #ffffff;
+            --accent-color: #0077dd;
+            --border-radius: 12px;
+        }
+        * {
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow: hidden;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+        .setting-item {
+            background-color: var(--item-bg-color);
+            border-radius: var(--border-radius);
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .setting-item-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 18px;
+        }
+        .icon {
+            font-size: 24px;
+            width: 30px;
+            text-align: center;
+        }
+        .label {
+            font-weight: 500;
+        }
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding-left: 40px;
+        }
+        /* Volume Slider */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 8px;
+            background: #555;
+            border-radius: 5px;
+            outline: none;
+            cursor: pointer;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            background: var(--text-color);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 24px;
+            height: 24px;
+            background: var(--text-color);
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+        }
+        /* Language Buttons */
+        .lang-buttons {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+        }
+        .lang-button {
+            flex-grow: 1;
+            padding: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-color);
+            background-color: #555;
+            border: 2px solid transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+        .lang-button.active {
+            background-color: var(--accent-color);
+            border-color: var(--text-color);
+        }
+        .close-button {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 36px;
+            height: 36px;
+            background-color: var(--item-bg-color);
+            color: var(--text-color);
+            border: none;
+            border-radius: 50%;
+            font-size: 20px;
+            line-height: 36px;
+            text-align: center;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="setting-item">
+        <div class="setting-item-header">
+            <span class="icon">&#x1F50A;</span>
+            <span class="label">System-Lautstärke</span>
+        </div>
+        <div class="control-group">
+            <span class="icon" style="font-size: 20px;">&#x1F508;</span>
+            <input type="range" id="volume-slider" min="0" max="100" step="1">
+            <span class="icon">&#x1F50A;</span>
+        </div>
+    </div>
+
+    <div class="setting-item">
+        <div class="setting-item-header">
+            <span class="icon">&#x1F310;</span>
+            <span class="label">Tastatursprache</span>
+        </div>
+        <div class="control-group lang-buttons">
+            <button class="lang-button" id="lang-de">Deutsch</button>
+            <button class="lang-button" id="lang-en">English</button>
+        </div>
+    </div>
+
+    <button class="close-button" id="close-btn">&times;</button>
+
+    <script>
+        const volumeSlider = document.getElementById('volume-slider');
+        const langBtnDE = document.getElementById('lang-de');
+        const langBtnEN = document.getElementById('lang-en');
+        const closeBtn = document.getElementById('close-btn');
+
+        // --- Event Listeners ---
+
+        // Volume
+        volumeSlider.addEventListener('input', (e) => {
+            const level = parseInt(e.target.value, 10);
+            window.api.setVolume(level);
+        });
+
+        // Language
+        langBtnDE.addEventListener('click', () => {
+            window.api.setKeyboardLanguage('de');
+            updateActiveLangButton('de');
+        });
+
+        langBtnEN.addEventListener('click', () => {
+            window.api.setKeyboardLanguage('en');
+            updateActiveLangButton('en');
+        });
+
+        // Close
+        closeBtn.addEventListener('click', () => {
+            window.api.toggleSettings(); // Reuse toggle to close
+        });
+
+        // --- Functions ---
+
+        function updateActiveLangButton(lang) {
+            langBtnDE.classList.toggle('active', lang === 'de');
+            langBtnEN.classList.toggle('active', lang === 'en');
+        }
+
+        // --- Initialization ---
+
+        async function initializeSettings() {
+            try {
+                const settings = await window.api.getInitialSettings();
+                if (settings) {
+                    volumeSlider.value = settings.volume;
+                    updateActiveLangButton(settings.keyboardLanguage);
+                }
+            } catch (error) {
+                console.error("Failed to get initial settings:", error);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', initializeSettings);
+    </script>
+</body>
+</html>
