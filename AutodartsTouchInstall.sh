@@ -103,16 +103,13 @@ print_success "Node.js is ready. Version: $(node -v)"
 # --- 3) Autodarts Installation
 print_header "Step 3: Installing Autodarts"
 print_info "Running the official Autodarts installation script..."
-if bash <(curl -sL get.autodarts.io) < /dev/null; then
+# We run the command in a subshell `()` to isolate any changes to file descriptors.
+# This prevents the external script from closing the standard input of our main script.
+if (bash <(curl -sL get.autodarts.io) < /dev/null); then
   print_success "Autodarts installed successfully."
 else
   print_error "Autodarts installation failed."
 fi
-
-# Reconnect standard input to the terminal. This is necessary because the previous
-# script may have closed or redirected it, which would prevent subsequent
-# 'read' commands from working.
-exec 0< /dev/tty
 
 # --- 4) Screen Rotation Configuration
 print_header "Step 4: Configure Screen Rotation"
