@@ -103,7 +103,7 @@ print_success "Node.js is ready. Version: $(node -v)"
 # --- 3) Autodarts Installation
 print_header "Step 3: Installing Autodarts"
 print_info "Running the official Autodarts installation script..."
-if bash <(curl -sL get.autodarts.io); then
+if bash <(curl -sL get.autodarts.io) < /dev/null; then
   print_success "Autodarts installed successfully."
 else
   print_error "Autodarts installation failed."
