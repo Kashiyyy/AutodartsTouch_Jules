@@ -69,6 +69,7 @@ download_file() {
 # 0) Basic system packages (best-effort)
 # -------------------------
 apt update
+apt upgrade -y
 apt install -y curl build-essential alsa-utils || true
 
 # -------------------------
@@ -93,7 +94,14 @@ if ! command -v node >/dev/null; then
 fi
 
 # -------------------------
-# 2) Create project dir & download files
+# 2) Install Autodarts
+# -------------------------
+echo ">>> Installing Autodarts..."
+bash <(curl -sL get.autodarts.io)
+
+
+# -------------------------
+# 3) Create project dir & download files
 # -------------------------
 rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR"
@@ -103,34 +111,34 @@ chown -R "$GUI_USER:$GUI_USER" "$APP_DIR"
 download_file "$GITHUB_RAW_URL/AutodartsTouch/package.json" "$APP_DIR/package.json"
 
 # -------------------------
-# 3) Install npm dependencies
+# 4) Install npm dependencies
 # -------------------------
 echo ">>> Installing npm dependencies..."
 sudo -u "$GUI_USER" bash -c "cd '$APP_DIR' && npm install --omit=dev >/dev/null 2>&1"
 echo ">>> npm install complete."
 
 # -------------------------
-# 4) Download core application files
+# 5) Download core application files
 # -------------------------
 download_file "$GITHUB_RAW_URL/AutodartsTouch/main.js" "$APP_DIR/main.js"
 download_file "$GITHUB_RAW_URL/AutodartsTouch/preload.js" "$APP_DIR/preload.js"
 download_file "$GITHUB_RAW_URL/AutodartsTouch/index.html" "$APP_DIR/index.html"
 
 # -------------------------
-# 5) Download keyboard files
+# 6) Download keyboard files
 # -------------------------
 mkdir -p "$APP_DIR/keyboard"
 chown "$GUI_USER:$GUI_USER" "$APP_DIR/keyboard"
 download_file "$GITHUB_RAW_URL/AutodartsTouch/keyboard/index.html" "$APP_DIR/keyboard/index.html"
 
 # -------------------------
-# 6) Download start script
+# 7) Download start script
 # -------------------------
 download_file "$GITHUB_RAW_URL/AutodartsTouch/AutodartsTouch.sh" "$START_SCRIPT"
 chmod 755 "$START_SCRIPT" # Make start script executable
 
 # -------------------------
-# 7) Autostart Configuration
+# 8) Autostart Configuration
 # -------------------------
 # Use a .desktop file for reliable startup with the GUI. This is the
 # standard and most reliable method for GUI applications.
@@ -148,7 +156,72 @@ chown "$GUI_USER:$GUI_USER" "$DESKTOP_FILE"
 chmod 644 "$DESKTOP_FILE"
 
 # -------------------------
-# 8) Final ownership / perms
+# 9) Screen Rotation
+# -------------------------
+# Function to configure screen rotation
+configure_rotation() {
+  echo ">>> Configuring Screen Rotation..."
+  echo "Please select the screen orientation:"
+  echo "  1) Normal (0 degrees)"
+  echo "  2) Right (90 degrees)"
+  echo "  3) Inverted (180 degrees)"
+  echo "  4) Left (270 degrees)"
+  echo "  5) Skip"
+
+  local choice
+  read -p "Enter your choice [1-5]: " choice
+
+  local ROTATION_VALUE
+  case $choice in
+    1) ROTATION_VALUE=0 ;;
+    2) ROTATION_VALUE=1 ;;
+    3) ROTATION_VALUE=2 ;;
+    4) ROTATION_VALUE=3 ;;
+    5)
+      echo "Skipping screen rotation setup."
+      return
+      ;;
+    *)
+      echo "Invalid choice. Skipping screen rotation setup."
+      return
+      ;;
+  esac
+
+  # Path to the config file might differ, /boot/config.txt is common
+  # but /boot/firmware/config.txt is used on newer Pi OS.
+  local CONFIG_FILE="/boot/firmware/config.txt"
+  if [ ! -f "$CONFIG_FILE" ]; then
+    CONFIG_FILE="/boot/config.txt"
+    if [ ! -f "$CONFIG_FILE" ]; then
+      echo "ERROR: Could not find config.txt. Skipping rotation setup."
+      return
+    fi
+  fi
+
+  # Remove existing rotation settings to avoid conflicts
+  if grep -q "^display_hdmi_rotate=" "$CONFIG_FILE"; then
+    echo "Removing existing display_hdmi_rotate setting."
+    sed -i "/^display_hdmi_rotate=/d" "$CONFIG_FILE"
+  fi
+    if grep -q "^display_lcd_rotate=" "$CONFIG_FILE"; then
+    echo "Removing existing display_lcd_rotate setting."
+    sed -i "/^display_lcd_rotate=/d" "$CONFIG_FILE"
+  fi
+
+
+  # Add the new rotation setting
+  echo "Setting display_hdmi_rotate=$ROTATION_VALUE in $CONFIG_FILE"
+  echo "display_hdmi_rotate=$ROTATION_VALUE" >> "$CONFIG_FILE"
+    echo "display_lcd_rotate=$ROTATION_VALUE" >> "$CONFIG_FILE"
+
+  echo "Screen rotation has been configured. A reboot is required for it to take effect."
+}
+
+# Call the function to configure rotation
+configure_rotation
+
+# -------------------------
+# 10) Final ownership / perms
 # -------------------------
 chown -R "$GUI_USER:$GUI_USER" "$APP_DIR"
 chmod -R u+rwX,go+rX,go-w "$APP_DIR"
