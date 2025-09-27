@@ -4,7 +4,7 @@ set -euo pipefail
 # ===================================================================================
 # GITHUB-BASED SETUP SCRIPT
 #
-# This script downloads the kiosk-electron application files from a GitHub repository,
+# This script downloads the AutodartsTouch application files from a GitHub repository,
 # installs dependencies, and configures the system for autostart.
 #
 # INSTRUCTIONS:
@@ -38,18 +38,18 @@ GITHUB_RAW_URL="${GITHUB_REPO_URL/github.com/raw.githubusercontent.com}/${BRANCH
 # -------------------------
 GUI_USER="${SUDO_USER:-$(logname)}"
 HOME_DIR="$(eval echo "~$GUI_USER")"
-APP_DIR="$HOME_DIR/kiosk-electron"
-START_SCRIPT="$APP_DIR/start_kiosk.sh"
+APP_DIR="$HOME_DIR/AutodartsTouch"
+START_SCRIPT="$APP_DIR/AutodartsTouch.sh"
 AUTOSTART_LXDIR="$HOME_DIR/.config/lxsession/LXDE-pi"
 AUTOSTART_FILE="$AUTOSTART_LXDIR/autostart"
 AUTOSTART_DESKTOP_DIR="$HOME_DIR/.config/autostart"
-DESKTOP_FILE="$AUTOSTART_DESKTOP_DIR/kiosk-electron.desktop"
+DESKTOP_FILE="$AUTOSTART_DESKTOP_DIR/AutodartsTouch.desktop"
 
 echo ">>> Setup starting for GUI-User: $GUI_USER"
 echo ">>> Home: $HOME_DIR"
 echo ">>> App-Folder: $APP_DIR"
 echo ">>> Installing from branch: ${BRANCH_NAME}"
-echo ">>> Downloading from: $GITHUB_RAW_URL"
+echo ">>> Downloading from: $GITHUB_RAW_URL/AutodartsTouch"
 echo
 
 # Function to download a file and set ownership
@@ -100,7 +100,7 @@ mkdir -p "$APP_DIR"
 chown -R "$GUI_USER:$GUI_USER" "$APP_DIR"
 
 # Download package.json first to install dependencies
-download_file "$GITHUB_RAW_URL/package.json" "$APP_DIR/package.json"
+download_file "$GITHUB_RAW_URL/AutodartsTouch/package.json" "$APP_DIR/package.json"
 
 # -------------------------
 # 3) Install npm dependencies
@@ -112,21 +112,21 @@ echo ">>> npm install complete."
 # -------------------------
 # 4) Download core application files
 # -------------------------
-download_file "$GITHUB_RAW_URL/main.js" "$APP_DIR/main.js"
-download_file "$GITHUB_RAW_URL/preload.js" "$APP_DIR/preload.js"
-download_file "$GITHUB_RAW_URL/index.html" "$APP_DIR/index.html"
+download_file "$GITHUB_RAW_URL/AutodartsTouch/main.js" "$APP_DIR/main.js"
+download_file "$GITHUB_RAW_URL/AutodartsTouch/preload.js" "$APP_DIR/preload.js"
+download_file "$GITHUB_RAW_URL/AutodartsTouch/index.html" "$APP_DIR/index.html"
 
 # -------------------------
 # 5) Download keyboard files
 # -------------------------
 mkdir -p "$APP_DIR/keyboard"
 chown "$GUI_USER:$GUI_USER" "$APP_DIR/keyboard"
-download_file "$GITHUB_RAW_URL/keyboard/index.html" "$APP_DIR/keyboard/index.html"
+download_file "$GITHUB_RAW_URL/AutodartsTouch/keyboard/index.html" "$APP_DIR/keyboard/index.html"
 
 # -------------------------
 # 6) Download start script
 # -------------------------
-download_file "$GITHUB_RAW_URL/start_kiosk.sh" "$START_SCRIPT"
+download_file "$GITHUB_RAW_URL/AutodartsTouch/AutodartsTouch.sh" "$START_SCRIPT"
 chmod 755 "$START_SCRIPT" # Make start script executable
 
 # -------------------------
@@ -139,7 +139,7 @@ mkdir -p "$AUTOSTART_DESKTOP_DIR"
 cat > "$DESKTOP_FILE" <<DESK
 [Desktop Entry]
 Type=Application
-Name=KioskElectron
+Name=AutodartsTouch
 Exec=bash $START_SCRIPT
 Terminal=false
 X-GNOME-Autostart-enabled=true
