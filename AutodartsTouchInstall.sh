@@ -163,8 +163,46 @@ configure_rotation() {
 }
 configure_rotation
 
-# --- 5) Download Autodarts Touch Application
-print_header "Step 5: Downloading Autodarts Touch Files"
+# --- 5) Argon One V5 Case Configuration
+print_header "Step 5: Argon One V5 Case Setup"
+configure_argon_one() {
+  echo
+  echo "This optional step enables the additional USB-A ports on the"
+  echo "Argon One V5 case by modifying the boot configuration."
+  echo
+
+  local choice
+  read -p "Do you have an Argon One V5 case and want to enable the extra USB ports? (y/N): " choice
+
+  case "$choice" in
+    [yY]|[yY][eE][sS])
+      local CONFIG_FILE="/boot/firmware/config.txt"
+      if [ ! -f "$CONFIG_FILE" ]; then
+        CONFIG_FILE="/boot/config.txt"
+        if [ ! -f "$CONFIG_FILE" ]; then
+          print_warning "Could not find config.txt. Skipping Argon One setup."
+          return
+        fi
+      fi
+
+      local argon_line="dtoverlay=dwc2,dr_mode=host"
+      if grep -q "^${argon_line}" "$CONFIG_FILE"; then
+        print_info "Argon One V5 setting already exists in $CONFIG_FILE. No changes needed."
+      else
+        print_info "Enabling Argon One V5 USB ports..."
+        echo "$argon_line" >> "$CONFIG_FILE"
+        print_success "Argon One V5 USB ports enabled. A reboot is required."
+      fi
+      ;;
+    *)
+      print_info "Skipping Argon One V5 case setup."
+      ;;
+  esac
+}
+configure_argon_one
+
+# --- 6) Download Autodarts Touch Application
+print_header "Step 6: Downloading Autodarts Touch Files"
 rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR"
 chown -R "$GUI_USER:$GUI_USER" "$APP_DIR"
@@ -181,8 +219,8 @@ mkdir -p "$APP_DIR/keyboard"
 chown "$GUI_USER:$GUI_USER" "$APP_DIR/keyboard"
 download_file "$GITHUB_RAW_URL/AutodartsTouch/keyboard/index.html" "$APP_DIR/keyboard/index.html"
 
-# --- 6) Install Node.js Dependencies
-print_header "Step 6: Installing Application Dependencies"
+# --- 7) Install Node.js Dependencies
+print_header "Step 7: Installing Application Dependencies"
 print_info "Running 'npm install'. This might take a moment..."
 if sudo -u "$GUI_USER" bash -c "cd '$APP_DIR' && npm install --omit=dev"; then
   print_success "Application dependencies installed."
@@ -190,8 +228,8 @@ else
   print_error "Failed to install npm dependencies. Please check the logs."
 fi
 
-# --- 7) Configure Autostart
-print_header "Step 7: Setting up Autostart"
+# --- 8) Configure Autostart
+print_header "Step 8: Setting up Autostart"
 print_info "Configuring the application to start automatically on boot."
 mkdir -p "$AUTOSTART_DESKTOP_DIR"
 cat > "$DESKTOP_FILE" <<DESK
@@ -207,8 +245,8 @@ chown "$GUI_USER:$GUI_USER" "$DESKTOP_FILE"
 chmod 644 "$DESKTOP_FILE"
 print_success "Autostart has been configured."
 
-# --- 8) Finalizing Setup
-print_header "Step 8: Finalizing Permissions"
+# --- 9) Finalizing Setup
+print_header "Step 9: Finalizing Permissions"
 chown -R "$GUI_USER:$GUI_USER" "$APP_DIR"
 chmod -R u+rwX,go+rX,go-w "$APP_DIR"
 print_success "File permissions have been set."
