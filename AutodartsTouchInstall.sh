@@ -75,7 +75,7 @@ configure_rotation() {
   echo "  5) Skip           (Do not change rotation)"
   echo
 
-  read -p "Enter your choice for screen rotation [1-5]: " ROTATION_CHOICE
+  read -p "Enter your choice for screen rotation [1-5]: " ROTATION_CHOICE < /dev/tty
 }
 
 # Ask about Argon One case
@@ -85,7 +85,7 @@ configure_argon_one() {
   echo "Argon One V5 case by modifying the boot configuration."
   echo
 
-  read -p "Do you have an Argon One V5 case and want to enable the extra USB ports? (y/N): " ARGON_CHOICE
+  read -p "Do you have an Argon One V5 case and want to enable the extra USB ports? (y/N): " ARGON_CHOICE < /dev/tty
 }
 
 # Call the functions to gather input
