@@ -4,7 +4,7 @@ set -euo pipefail
 export DISPLAY=:0
 export XAUTHORITY="$HOME/.Xauthority"
 
-cd "$HOME/kiosk-electron" || exit 1
+cd "$HOME/AutodartsTouch" || exit 1
 
 # Start keyboard server in background (optional, keyboard page already loads via file://)
 node keyboard-server.js &>/dev/null &
