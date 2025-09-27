@@ -20,7 +20,7 @@ GITHUB_RAW_URL="${GITHUB_REPO_URL/github.com/raw.githubusercontent.com}/${BRANCH
 GUI_USER="${SUDO_USER:-$(logname)}"
 HOME_DIR="$(eval echo "~$GUI_USER")"
 APP_DIR="$HOME_DIR/AutodartsTouch"
-START_SCRIPT="$APP_DIR/start.sh"
+START_SCRIPT="$APP_DIR/AutodartsTouch.sh"
 AUTOSTART_DESKTOP_DIR="$HOME_DIR/.config/autostart"
 DESKTOP_FILE="$AUTOSTART_DESKTOP_DIR/AutodartsTouch.desktop"
 
