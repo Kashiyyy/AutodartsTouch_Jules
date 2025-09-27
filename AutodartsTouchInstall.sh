@@ -109,6 +109,11 @@ else
   print_error "Autodarts installation failed."
 fi
 
+# Reconnect standard input to the terminal. This is necessary because the previous
+# script may have closed or redirected it, which would prevent subsequent
+# 'read' commands from working.
+exec 0< /dev/tty
+
 # --- 4) Screen Rotation Configuration
 print_header "Step 4: Configure Screen Rotation"
 configure_rotation() {
