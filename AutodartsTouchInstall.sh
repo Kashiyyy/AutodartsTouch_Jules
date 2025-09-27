@@ -12,9 +12,6 @@ set -euo pipefail
 # ===================================================================================
 
 # --- Configuration
-# This script can be run for a specific branch by passing its name as an argument.
-# Example: sudo bash AutodartsTouchInstall.sh my-feature-branch
-# Defaults to 'main' if no branch is specified.
 BRANCH_NAME="${1:-main}"
 GITHUB_REPO_URL="https://github.com/Kashiyyy/AutodartsTouch_Jules"
 GITHUB_RAW_URL="${GITHUB_REPO_URL/github.com/raw.githubusercontent.com}/${BRANCH_NAME}"
@@ -26,6 +23,10 @@ APP_DIR="$HOME_DIR/AutodartsTouch"
 START_SCRIPT="$APP_DIR/start.sh"
 AUTOSTART_DESKTOP_DIR="$HOME_DIR/.config/autostart"
 DESKTOP_FILE="$AUTOSTART_DESKTOP_DIR/AutodartsTouch.desktop"
+
+# --- Global variables to store user choices
+ROTATION_CHOICE=""
+ARGON_CHOICE=""
 
 # --- Helper Functions
 print_header() {
@@ -52,26 +53,47 @@ print_error() {
   exit 1
 }
 
-# Function to download a file and set ownership
-download_file() {
-  local url="$1"
-  local dest="$2"
-  print_info "Downloading file to $dest"
-  if ! curl -sSL --fail -o "$dest" "$url"; then
-    print_error "Failed to download file from $url. Please check the URL and your connection."
-  fi
-  chown "$GUI_USER:$GUI_USER" "$dest"
-  chmod 644 "$dest"
-}
-
 # --- Start of Installation
 print_header "Starting Autodarts Touch Setup"
 print_info "Running as user: $GUI_USER"
 print_info "Application will be installed in: $APP_DIR"
 print_info "Installing from branch: $BRANCH_NAME"
 
-# --- 1) System Update and Package Installation
-print_header "Step 1: Updating System Packages"
+# --- Step 1: Gather All User Input
+print_header "Step 1: Configuration Questions"
+
+# Ask about screen rotation
+configure_rotation() {
+  echo
+  echo "Please choose your screen orientation from the options below."
+  echo "This setting is for the physical display connected to your Raspberry Pi."
+  echo
+  echo "  1) Normal         (0 degrees, standard landscape)"
+  echo "  2) Right-side up  (90 degrees, portrait)"
+  echo "  3) Upside down    (180 degrees, inverted landscape)"
+  echo "  4) Left-side up   (270 degrees, portrait)"
+  echo "  5) Skip           (Do not change rotation)"
+  echo
+
+  read -p "Enter your choice for screen rotation [1-5]: " ROTATION_CHOICE
+}
+
+# Ask about Argon One case
+configure_argon_one() {
+  echo
+  echo "This optional step enables the additional USB-A ports on the"
+  echo "Argon One V5 case by modifying the boot configuration."
+  echo
+
+  read -p "Do you have an Argon One V5 case and want to enable the extra USB ports? (y/N): " ARGON_CHOICE
+}
+
+# Call the functions to gather input
+configure_rotation
+configure_argon_one
+
+# --- Step 2: System Update and Package Installation
+print_header "Step 2: Updating System Packages"
 print_info "Updating package lists..."
 apt update
 print_info "Upgrading installed packages... (This may take a while)"
@@ -79,9 +101,8 @@ apt upgrade -y
 print_info "Installing required packages: curl, build-essential, alsa-utils..."
 apt install -y curl build-essential alsa-utils || print_warning "Could not install all packages, but continuing."
 
-# --- 2) Node.js Installation
-print_header "Step 2: Installing Node.js"
-# Remove older versions to prevent conflicts
+# --- Step 3: Node.js Installation
+print_header "Step 3: Installing Node.js"
 print_info "Removing any old versions of Node.js..."
 apt remove -y nodejs npm >/dev/null 2>&1 || true
 apt purge -y nodejs npm >/dev/null 2>&1 || true
@@ -100,129 +121,46 @@ if ! command -v node >/dev/null; then
 fi
 print_success "Node.js is ready. Version: $(node -v)"
 
-# --- 3) Autodarts Installation
-print_header "Step 3: Installing Autodarts"
+# --- Step 4: Autodarts Installation
+print_header "Step 4: Installing Autodarts"
 print_info "Running the official Autodarts installation script..."
-# We run the command in a subshell `()` to isolate any changes to file descriptors.
-# This prevents the external script from closing the standard input of our main script.
+# We run the command in a subshell `()` to isolate it completely.
 if (bash <(curl -sL get.autodarts.io) < /dev/null); then
   print_success "Autodarts installed successfully."
 else
   print_error "Autodarts installation failed."
 fi
 
-# --- 4) Screen Rotation Configuration
-print_header "Step 4: Configure Screen Rotation"
-configure_rotation() {
-  echo "Please choose your screen orientation from the options below."
-  echo "This setting is for the physical display connected to your Raspberry Pi."
-  echo
-  echo "  1) Normal         (0 degrees, standard landscape)"
-  echo "  2) Right-side up  (90 degrees, portrait)"
-  echo "  3) Upside down    (180 degrees, inverted landscape)"
-  echo "  4) Left-side up   (270 degrees, portrait)"
-  echo "  5) Skip           (Do not change rotation)"
-  echo
-
-  local choice
-  read -p "Enter your choice [1-5]: " choice
-
-  local ROTATION_VALUE
-  case $choice in
-    1) ROTATION_VALUE=0 ;;
-    2) ROTATION_VALUE=1 ;;
-    3) ROTATION_VALUE=2 ;;
-    4) ROTATION_VALUE=3 ;;
-    5)
-      print_info "Skipping screen rotation setup."
-      return
-      ;;
-    *)
-      print_warning "Invalid choice. Skipping screen rotation setup."
-      return
-      ;;
-  esac
-
-  local CONFIG_FILE="/boot/firmware/config.txt"
-  if [ ! -f "$CONFIG_FILE" ]; then
-    CONFIG_FILE="/boot/config.txt"
-    if [ ! -f "$CONFIG_FILE" ]; then
-      print_warning "Could not find config.txt. Skipping rotation setup."
-      return
-    fi
-  fi
-
-  print_info "Updating display rotation settings in $CONFIG_FILE..."
-  # Remove existing rotation settings to avoid conflicts
-  sed -i "/^display_hdmi_rotate=/d" "$CONFIG_FILE" 2>/dev/null || true
-  sed -i "/^display_lcd_rotate=/d" "$CONFIG_FILE" 2>/dev/null || true
-
-  # Add the new rotation setting for both HDMI and LCD displays
-  echo "display_hdmi_rotate=$ROTATION_VALUE" >> "$CONFIG_FILE"
-  echo "display_lcd_rotate=$ROTATION_VALUE" >> "$CONFIG_FILE"
-
-  print_success "Screen rotation set. A reboot is required to apply the change."
-}
-configure_rotation
-
-# --- 5) Argon One V5 Case Configuration
-print_header "Step 5: Argon One V5 Case Setup"
-configure_argon_one() {
-  echo
-  echo "This optional step enables the additional USB-A ports on the"
-  echo "Argon One V5 case by modifying the boot configuration."
-  echo
-
-  local choice
-  read -p "Do you have an Argon One V5 case and want to enable the extra USB ports? (y/N): " choice
-
-  case "$choice" in
-    [yY]|[yY][eE][sS])
-      local CONFIG_FILE="/boot/firmware/config.txt"
-      if [ ! -f "$CONFIG_FILE" ]; then
-        CONFIG_FILE="/boot/config.txt"
-        if [ ! -f "$CONFIG_FILE" ]; then
-          print_warning "Could not find config.txt. Skipping Argon One setup."
-          return
-        fi
-      fi
-
-      local argon_line="dtoverlay=dwc2,dr_mode=host"
-      if grep -q "^${argon_line}" "$CONFIG_FILE"; then
-        print_info "Argon One V5 setting already exists in $CONFIG_FILE. No changes needed."
-      else
-        print_info "Enabling Argon One V5 USB ports..."
-        echo "$argon_line" >> "$CONFIG_FILE"
-        print_success "Argon One V5 USB ports enabled. A reboot is required."
-      fi
-      ;;
-    *)
-      print_info "Skipping Argon One V5 case setup."
-      ;;
-  esac
-}
-configure_argon_one
-
-# --- 6) Download Autodarts Touch Application
-print_header "Step 6: Downloading Autodarts Touch Files"
+# --- Step 5: Download Autodarts Touch Application
+print_header "Step 5: Downloading Autodarts Touch Files"
 rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR"
 chown -R "$GUI_USER:$GUI_USER" "$APP_DIR"
+
+download_file() {
+  local url="$1"
+  local dest="$2"
+  print_info "Downloading file to $dest"
+  if ! curl -sSL --fail -o "$dest" "$url"; then
+    print_error "Failed to download file from $url. Please check the URL and your connection."
+  fi
+  chown "$GUI_USER:$GUI_USER" "$dest"
+  chmod 644 "$dest"
+}
 
 download_file "$GITHUB_RAW_URL/AutodartsTouch/package.json" "$APP_DIR/package.json"
 download_file "$GITHUB_RAW_URL/AutodartsTouch/main.js" "$APP_DIR/main.js"
 download_file "$GITHUB_RAW_URL/AutodartsTouch/preload.js" "$APP_DIR/preload.js"
 download_file "$GITHUB_RAW_URL/AutodartsTouch/index.html" "$APP_DIR/index.html"
 download_file "$GITHUB_RAW_URL/AutodartsTouch/AutodartsTouch.sh" "$START_SCRIPT"
-chmod +x "$START_SCRIPT" # Make start script executable
+chmod +x "$START_SCRIPT"
 
-# Create keyboard directory and download its files
 mkdir -p "$APP_DIR/keyboard"
 chown "$GUI_USER:$GUI_USER" "$APP_DIR/keyboard"
 download_file "$GITHUB_RAW_URL/AutodartsTouch/keyboard/index.html" "$APP_DIR/keyboard/index.html"
 
-# --- 7) Install Node.js Dependencies
-print_header "Step 7: Installing Application Dependencies"
+# --- Step 6: Install Node.js Dependencies
+print_header "Step 6: Installing Application Dependencies"
 print_info "Running 'npm install'. This might take a moment..."
 if sudo -u "$GUI_USER" bash -c "cd '$APP_DIR' && npm install --omit=dev"; then
   print_success "Application dependencies installed."
@@ -230,7 +168,63 @@ else
   print_error "Failed to install npm dependencies. Please check the logs."
 fi
 
-# --- 8) Configure Autostart
+# --- Step 7: Apply System Configurations
+print_header "Step 7: Applying System Configurations"
+
+# Apply screen rotation
+ROTATION_VALUE=""
+case $ROTATION_CHOICE in
+  1) ROTATION_VALUE=0 ;;
+  2) ROTATION_VALUE=1 ;;
+  3) ROTATION_VALUE=2 ;;
+  4) ROTATION_VALUE=3 ;;
+esac
+
+if [ -n "$ROTATION_VALUE" ]; then
+  CONFIG_FILE="/boot/firmware/config.txt"
+  if [ ! -f "$CONFIG_FILE" ]; then
+    CONFIG_FILE="/boot/config.txt"
+  fi
+  if [ -f "$CONFIG_FILE" ]; then
+    print_info "Updating display rotation settings in $CONFIG_FILE..."
+    sed -i "/^display_hdmi_rotate=/d" "$CONFIG_FILE" 2>/dev/null || true
+    sed -i "/^display_lcd_rotate=/d" "$CONFIG_FILE" 2>/dev/null || true
+    echo "display_hdmi_rotate=$ROTATION_VALUE" >> "$CONFIG_FILE"
+    echo "display_lcd_rotate=$ROTATION_VALUE" >> "$CONFIG_FILE"
+    print_success "Screen rotation set. A reboot is required to apply the change."
+  else
+    print_warning "Could not find config.txt. Skipping rotation setup."
+  fi
+else
+  print_info "Skipping screen rotation setup as requested."
+fi
+
+# Apply Argon One config
+case "$ARGON_CHOICE" in
+  [yY]|[yY][eE][sS])
+    CONFIG_FILE="/boot/firmware/config.txt"
+    if [ ! -f "$CONFIG_FILE" ]; then
+      CONFIG_FILE="/boot/config.txt"
+    fi
+    if [ -f "$CONFIG_FILE" ]; then
+      argon_line="dtoverlay=dwc2,dr_mode=host"
+      if grep -q "^${argon_line}" "$CONFIG_FILE"; then
+        print_info "Argon One V5 setting already exists. No changes needed."
+      else
+        print_info "Enabling Argon One V5 USB ports..."
+        echo "$argon_line" >> "$CONFIG_FILE"
+        print_success "Argon One V5 USB ports enabled. A reboot is required."
+      fi
+    else
+      print_warning "Could not find config.txt. Skipping Argon One setup."
+    fi
+    ;;
+  *)
+    print_info "Skipping Argon One V5 case setup as requested."
+    ;;
+esac
+
+# --- Step 8: Configure Autostart
 print_header "Step 8: Setting up Autostart"
 print_info "Configuring the application to start automatically on boot."
 mkdir -p "$AUTOSTART_DESKTOP_DIR"
@@ -247,7 +241,7 @@ chown "$GUI_USER:$GUI_USER" "$DESKTOP_FILE"
 chmod 644 "$DESKTOP_FILE"
 print_success "Autostart has been configured."
 
-# --- 9) Finalizing Setup
+# --- Step 9: Finalizing Setup
 print_header "Step 9: Finalizing Permissions"
 chown -R "$GUI_USER:$GUI_USER" "$APP_DIR"
 chmod -R u+rwX,go+rX,go-w "$APP_DIR"
@@ -262,5 +256,5 @@ echo
 print_info "To start the application manually now, you can run:"
 echo "  bash $START_SCRIPT"
 echo
-print_warning "A reboot is recommended to apply all changes (especially screen rotation)."
+print_warning "A reboot is recommended to apply all changes."
 echo
