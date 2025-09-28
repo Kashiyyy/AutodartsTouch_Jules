@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('api', {
   openSettings: () => ipcRenderer.send('open-settings'),
   switchTab: (t) => ipcRenderer.send('switch-tab', t),
   refresh: () => ipcRenderer.send('refresh'),
+  forceReload: () => ipcRenderer.send('force-reload'),
   toggleWebKeyboard: () => ipcRenderer.send('toggle-webkeyboard'),
   getTabs: () => ipcRenderer.invoke('get-tabs'),
   sendKey: (key) => ipcRenderer.send('webkeyboard-key', key),

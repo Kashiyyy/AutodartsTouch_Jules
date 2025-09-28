@@ -10,7 +10,7 @@
       color: #fff;
       padding: 20px;
       margin: 0;
-      height: 100vh;
+      min-height: 100vh; /* Changed from height to allow scrolling */
       box-sizing: border-box;
       background-image:
         radial-gradient(50% 30% at 86% 0%, #313370e3, #40348600),
@@ -23,11 +23,27 @@
         radial-gradient(75% 75% at 50% 50%, #3662b9 1%, #2d285b);
       background-repeat: no-repeat;
       background-size: cover;
+      background-attachment: fixed; /* This makes the background stay in place */
     }
-    h1 { text-align: center; }
-    .setting { margin-bottom: 20px; max-width: 600px; margin-left: auto; margin-right: auto; }
+    .container {
+      max-width: 650px;
+      margin: 0 auto; /* Center the container */
+      background-color: rgba(0, 0, 0, 0.2); /* Optional: slight background for readability */
+      padding: 20px;
+      border-radius: 10px;
+    }
+    h1, h2 { text-align: center; }
+    .setting { margin-bottom: 20px; }
     label { display: block; margin-bottom: 5px; }
-    input[type="range"] { width: 100%; }
+    input[type="range"], input[type="text"] {
+      width: 100%;
+      box-sizing: border-box; /* To include padding and border in the width */
+      padding: 8px;
+      border-radius: 4px;
+      border: 1px solid #555;
+      background-color: #222;
+      color: #fff;
+    }
     .buttons { text-align: center; margin-top: 30px; }
     button {
       background-color: #525254;
@@ -46,90 +62,92 @@
   </style>
 </head>
 <body>
-  <h1>Einstellungen</h1>
+  <div class="container">
+    <h1>Einstellungen</h1>
 
-  <div class="setting">
-    <label for="volume">Systemlautstärke</label>
-    <input type="range" id="volume" min="0" max="100" value="50">
-  </div>
+    <div class="setting">
+      <label for="volume">Systemlautstärke</label>
+      <input type="range" id="volume" min="0" max="100" value="50">
+    </div>
 
-  <div class="setting">
-    <label for="keyboardWidth">Breite der Tastatur (%)</label>
-    <input type="range" id="keyboardWidth" min="50" max="100" value="100">
-  </div>
+    <div class="setting">
+      <label for="keyboardWidth">Breite der Tastatur (%)</label>
+      <input type="range" id="keyboardWidth" min="50" max="100" value="100">
+    </div>
 
-  <div class="setting">
-    <label for="keyHeight">Höhe der Tasten (px)</label>
-    <input type="range" id="keyHeight" min="30" max="80" value="50">
-  </div>
+    <div class="setting">
+      <label for="keyHeight">Höhe der Tasten (px)</label>
+      <input type="range" id="keyHeight" min="30" max="80" value="50">
+    </div>
 
-  <div class="tabs-settings">
-    <h2>Tab-Einstellungen</h2>
-    <!-- Tab 1 -->
-    <div class="tab-setting">
-      <h3 style="color: #fff; text-align: center;">Tab 1</h3>
-      <div class="setting">
-        <label for="tabName1">Tab-Name</label>
-        <input type="text" id="tabName1" placeholder="z.B. Autodarts">
+    <div class="tabs-settings">
+      <h2>Tab-Einstellungen</h2>
+      <!-- Tab 1 -->
+      <div class="tab-setting">
+        <h3 style="color: #fff; text-align: center;">Tab 1</h3>
+        <div class="setting">
+          <label for="tabName1">Tab-Name</label>
+          <input type="text" id="tabName1" placeholder="z.B. Autodarts">
+        </div>
+        <div class="setting">
+          <label for="tabUrl1">URL</label>
+          <input type="text" id="tabUrl1" placeholder="https://autodarts.io">
+        </div>
       </div>
-      <div class="setting">
-        <label for="tabUrl1">URL</label>
-        <input type="text" id="tabUrl1" placeholder="https://autodarts.io">
+      <!-- Tab 2 -->
+      <div class="tab-setting">
+        <h3 style="color: #fff; text-align: center;">Tab 2</h3>
+        <div class="setting">
+          <label for="tabName2">Tab-Name</label>
+          <input type="text" id="tabName2" placeholder="z.B. Google">
+        </div>
+        <div class="setting">
+          <label for="tabUrl2">URL</label>
+          <input type="text" id="tabUrl2" placeholder="https://google.com">
+        </div>
+      </div>
+      <!-- Tab 3 -->
+      <div class="tab-setting">
+        <h3 style="color: #fff; text-align: center;">Tab 3</h3>
+        <div class="setting">
+          <label for="tabName3">Tab-Name</label>
+          <input type="text" id="tabName3" placeholder="Name für Tab 3">
+        </div>
+        <div class="setting">
+          <label for="tabUrl3">URL</label>
+          <input type="text" id="tabUrl3" placeholder="URL für Tab 3">
+        </div>
+      </div>
+      <!-- Tab 4 -->
+      <div class="tab-setting">
+        <h3 style="color: #fff; text-align: center;">Tab 4</h3>
+        <div class="setting">
+          <label for="tabName4">Tab-Name</label>
+          <input type="text" id="tabName4" placeholder="Name für Tab 4">
+        </div>
+        <div class="setting">
+          <label for="tabUrl4">URL</label>
+          <input type="text" id="tabUrl4" placeholder="URL für Tab 4">
+        </div>
+      </div>
+      <!-- Tab 5 -->
+      <div class="tab-setting">
+        <h3 style="color: #fff; text-align: center;">Tab 5</h3>
+        <div class="setting">
+          <label for="tabName5">Tab-Name</label>
+          <input type="text" id="tabName5" placeholder="Name für Tab 5">
+        </div>
+        <div class="setting">
+          <label for="tabUrl5">URL</label>
+          <input type="text" id="tabUrl5" placeholder="URL für Tab 5">
+        </div>
       </div>
     </div>
-    <!-- Tab 2 -->
-    <div class="tab-setting">
-      <h3 style="color: #fff; text-align: center;">Tab 2</h3>
-      <div class="setting">
-        <label for="tabName2">Tab-Name</label>
-        <input type="text" id="tabName2" placeholder="z.B. Google">
-      </div>
-      <div class="setting">
-        <label for="tabUrl2">URL</label>
-        <input type="text" id="tabUrl2" placeholder="https://google.com">
-      </div>
-    </div>
-    <!-- Tab 3 -->
-    <div class="tab-setting">
-      <h3 style="color: #fff; text-align: center;">Tab 3</h3>
-      <div class="setting">
-        <label for="tabName3">Tab-Name</label>
-        <input type="text" id="tabName3" placeholder="Name für Tab 3">
-      </div>
-      <div class="setting">
-        <label for="tabUrl3">URL</label>
-        <input type="text" id="tabUrl3" placeholder="URL für Tab 3">
-      </div>
-    </div>
-    <!-- Tab 4 -->
-    <div class="tab-setting">
-      <h3 style="color: #fff; text-align: center;">Tab 4</h3>
-      <div class="setting">
-        <label for="tabName4">Tab-Name</label>
-        <input type="text" id="tabName4" placeholder="Name für Tab 4">
-      </div>
-      <div class="setting">
-        <label for="tabUrl4">URL</label>
-        <input type="text" id="tabUrl4" placeholder="URL für Tab 4">
-      </div>
-    </div>
-    <!-- Tab 5 -->
-    <div class="tab-setting">
-      <h3 style="color: #fff; text-align: center;">Tab 5</h3>
-      <div class="setting">
-        <label for="tabName5">Tab-Name</label>
-        <input type="text" id="tabName5" placeholder="Name für Tab 5">
-      </div>
-      <div class="setting">
-        <label for="tabUrl5">URL</label>
-        <input type="text" id="tabUrl5" placeholder="URL für Tab 5">
-      </div>
-    </div>
-  </div>
 
-  <div class="buttons">
-    <button id="saveBtn">Speichern & Schließen</button>
-    <button id="closeBtn">Schließen</button>
+    <div class="buttons">
+      <button id="saveBtn">Speichern & Schließen</button>
+      <button id="closeBtn">Schließen</button>
+    </div>
   </div>
 
   <script>
@@ -182,7 +200,7 @@
       });
     }
 
-    // Add listeners for live updates
+    // Add listeners for live-updates
     keyboardWidthSlider.addEventListener('input', sendLiveUpdate);
     keyHeightSlider.addEventListener('input', sendLiveUpdate);
 

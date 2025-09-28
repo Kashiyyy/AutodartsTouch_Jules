@@ -548,6 +548,18 @@ ipcMain.on('refresh', () => {
   const view = (currentView === 'settings') ? settingsView : views[currentView];
   if (view) view.webContents.reload();
 });
+
+ipcMain.on('force-reload', () => {
+  const view = views[currentView];
+  if (view) {
+    const tabs = store.get('tabs', []);
+    const tabIndex = parseInt(currentView.replace('tab', ''), 10);
+    if (tabs[tabIndex] && tabs[tabIndex].url) {
+      view.webContents.loadURL(tabs[tabIndex].url);
+    }
+  }
+});
+
 ipcMain.on('toggle-webkeyboard', () => {
   // Prevent hiding the keyboard while in the settings view
   if (currentView === 'settings') {

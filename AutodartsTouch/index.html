@@ -40,7 +40,7 @@ button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 a
 
     <div style="display:flex;align-items:center;justify-content:center;">
       <button class="sidebtn" id="settingsBtn" aria-label="Einstellungen">&#x2699;</button>
-      <button class="sidebtn" onclick="api.refresh()" aria-label="Aktualisieren">&#x27F3;</button>
+      <button class="sidebtn" id="refreshBtn" aria-label="Aktualisieren">&#x27F3;</button>
     </div>
   </div>
 
@@ -95,6 +95,37 @@ button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 a
   settingsBtn.addEventListener('click', () => {
     if (window.api && window.api.openSettings) {
       window.api.openSettings();
+    }
+  });
+
+  const refreshBtn = document.getElementById('refreshBtn');
+  let pressTimer = null;
+
+  refreshBtn.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    pressTimer = window.setTimeout(() => {
+      if (window.api && window.api.forceReload) {
+        window.api.forceReload();
+      }
+      pressTimer = null;
+    }, 800); // 800ms for long press
+  });
+
+  refreshBtn.addEventListener('pointerup', (e) => {
+    e.preventDefault();
+    if (pressTimer) {
+      clearTimeout(pressTimer);
+      pressTimer = null;
+      if (window.api && window.api.refresh) {
+        window.api.refresh();
+      }
+    }
+  });
+
+  refreshBtn.addEventListener('pointerleave', () => {
+    if (pressTimer) {
+      clearTimeout(pressTimer);
+      pressTimer = null;
     }
   });
 </script>
