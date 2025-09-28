@@ -649,10 +649,15 @@ ipcMain.on('webkeyboard-key', (ev, key) => {
     let charToSend = key;
     
     // Mobile keyboard handles most case conversion, but handle special German characters
-    const specialChars = {
-      'ä': 'ä', 'ö': 'ö', 'ü': 'ü', 'ß': 'ß',
-      'Ä': 'Ä', 'Ö': 'Ö', 'Ü': 'Ü'
-    };
+  const specialChars = {
+    '\u00E4': '\u00E4',
+    '\u00F6': '\u00F6',
+    '\u00FC': '\u00FC',
+    '\u00DF': '\u00DF',
+    '\u00C4': '\u00C4',
+    '\u00D6': '\u00D6', 
+    '\u00DC': '\u00DC'  
+  };
     
     if (specialChars[key]) {
       charToSend = specialChars[key];
