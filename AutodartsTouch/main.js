@@ -37,79 +37,52 @@ async function createWindow() {
     }
   });
 
-  // Create static views first
+  // Create static views that are never reloaded
   settingsView = new BrowserView({ webPreferences: { sandbox: false, preload: path.join(__dirname, 'preload.js') } });
-  settingsView.webContents.loadFile(path.join(__dirname, 'settings.html')).catch(e => console.error('settings load', e));
   mainWindow.addBrowserView(settingsView);
+  settingsView.webContents.loadFile(path.join(__dirname, 'settings.html'));
 
   powerMenuView = new BrowserView({
-    webPreferences: {
-      contextIsolation: true,
-      sandbox: false,
-      preload: path.join(__dirname, 'preload.js')
-    },
+    webPreferences: { contextIsolation: true, sandbox: false, preload: path.join(__dirname, 'preload.js') },
     transparent: true
   });
-  powerMenuView.webContents.loadFile(path.join(__dirname, 'power-menu.html')).catch(e => console.error('power menu load', e));
+  mainWindow.addBrowserView(powerMenuView);
+  powerMenuView.webContents.loadFile(path.join(__dirname, 'power-menu.html'));
 
-  // Create all the dynamic views and wait for them to load
-  await createAllViews();
-
-  // Determine the initial tab to show
-  const initialTab = Object.keys(views).length > 0 ? 'tab0' : null;
-  if (initialTab) {
-    showTab(initialTab);
-  }
-
-  applySettings();
-
-  // Setup auto-keyboard after views are ready
-  setTimeout(() => {
-    setupAutoKeyboard();
-  }, 1000);
-
-  // Additional setup for localhost (might need more time to load)
-  setTimeout(() => {
-    console.log('Re-running auto-keyboard setup for localhost pages...');
-    setupAutoKeyboard();
-  }, 3000);
+  // Load dynamic views for the first time
+  await reloadDynamicViews();
 
   mainWindow.on('resize', () => {
-    showTab(currentView);
-    if (keyboardVisible) updateKeyboardBounds();
+    if (mainWindow && !mainWindow.isDestroyed() && toolbarView) {
+      showTab(currentView);
+      if (keyboardVisible) updateKeyboardBounds();
+    }
   });
 }
 
-function createTabViews() {
+function createDynamicViews() {
   const loadingPromises = [];
+
+  // Tab views
   const tabs = store.get('tabs', [
     { name: 'Autodarts', url: 'https://play.autodarts.io/' },
     { name: 'Service', url: 'http://localhost:3180/' }
   ]);
-
-  // Create BrowserViews for each configured tab
   tabs.forEach((tab, index) => {
     if (tab && tab.url && tab.url.trim() !== '') {
       const view = new BrowserView({ webPreferences: { sandbox: false, preload: path.join(__dirname, 'preload.js') } });
       mainWindow.addBrowserView(view);
       views[`tab${index}`] = view;
-      // Add the promise to the array and catch individual errors so one failed tab doesn't block others
-      loadingPromises.push(view.webContents.loadURL(tab.url).catch(e => {
-        console.error(`tab${index} load error:`, e);
-      }));
+      loadingPromises.push(view.webContents.loadURL(tab.url).catch(e => console.error(`tab${index} load error:`, e)));
     }
   });
-  return loadingPromises;
-}
-
-function createAllViews() {
-  const tabLoadingPromises = createTabViews(); // This populates `views` and returns promises
 
   // Toolbar view
   toolbarView = new BrowserView({
     webPreferences: { contextIsolation: true, sandbox: false, preload: path.join(__dirname, 'preload.js') }
   });
   mainWindow.addBrowserView(toolbarView);
+  loadingPromises.push(toolbarView.webContents.loadFile(path.join(__dirname, 'index.html')));
 
   // Keyboard view
   const keyboardLayout = store.get('keyboard.layout', 'de');
@@ -117,77 +90,58 @@ function createAllViews() {
     webPreferences: { contextIsolation: true, sandbox: false, preload: path.join(__dirname, 'preload.js') },
     transparent: true
   });
+  mainWindow.addBrowserView(keyboardView);
+  loadingPromises.push(keyboardView.webContents.loadFile(path.join(__dirname, 'keyboard', 'index.html'), {
+    query: { layout: keyboardLayout }
+  }));
 
-  // Combine all loading promises
-  const allPromises = [
-    ...tabLoadingPromises,
-    toolbarView.webContents.loadFile(path.join(__dirname, 'index.html')),
-    keyboardView.webContents.loadFile(path.join(__dirname, 'keyboard', 'index.html'), {
-      query: { layout: keyboardLayout }
-    })
-  ];
-
-  return Promise.all(allPromises).catch(e => console.error('Error loading one or more views:', e));
+  return Promise.all(loadingPromises).catch(e => console.error('Error loading one or more dynamic views:', e));
 }
 
-async function reloadUI() {
-  console.log('Reloading entire UI...');
+async function reloadDynamicViews() {
+  console.log('Reloading dynamic views...');
   if (!mainWindow) return;
 
-  // 1. Destroy all existing dynamic views
-  const allViews = [
+  // 1. Destroy only the dynamic views
+  const dynamicViews = [
     ...Object.values(views),
     toolbarView,
-    keyboardView
+    keyboardView,
   ];
-
-  allViews.forEach(view => {
+  dynamicViews.forEach(view => {
     if (view && !view.webContents.isDestroyed()) {
-      try {
-        mainWindow.removeBrowserView(view);
-        view.webContents.destroy();
-      } catch (e) {
-        console.error('Error destroying a view:', e);
-      }
+      mainWindow.removeBrowserView(view);
+      view.webContents.destroy();
     }
   });
 
-  // 2. Reset view containers
+  // 2. Reset dynamic view containers
   views = {};
   toolbarView = null;
   keyboardView = null;
-  keyboardVisible = false; // Reset keyboard state
+  keyboardVisible = false;
 
-  // 3. Re-create all views and wait for them to load
+  // 3. Re-create dynamic views and wait for them to load
   try {
-    await createAllViews();
-    console.log('All views finished loading after reload.');
+    await createDynamicViews();
+    console.log('Dynamic views finished loading.');
   } catch (error) {
-    console.error('An error occurred during UI reload:', error);
-    // In a real app, you might want to show an error message to the user here
+    console.error('An error occurred during dynamic view reload:', error);
+    return;
   }
 
   // 4. Determine initial tab and layout the UI
-  let firstAvailableTab = null;
-  for (let i = 0; i < 10; i++) { // Check for a reasonable number of tabs
-      if (views[`tab${i}`]) {
-          firstAvailableTab = `tab${i}`;
-          break;
-      }
-  }
+  let firstAvailableTab = Object.keys(views).length > 0 ? 'tab0' : null;
+  currentView = firstAvailableTab;
+  showTab(currentView);
 
-  if (firstAvailableTab) {
-    currentView = firstAvailableTab;
-    showTab(firstAvailableTab);
-  } else {
-    // If no tabs exist, hide all other views to avoid a blank screen with artifacts
-    if(settingsView) settingsView.setBounds({ x: 0, y: mainWindow.getBounds().height, width: 1, height: 1 });
-    showTab(null);
-  }
+  // 5. Apply settings and run setup
+  applySettings();
+  setTimeout(() => {
+    setupAutoKeyboard();
+  }, 1000);
 
-  // 5. Re-run setup
-  setupAutoKeyboard();
-  console.log('UI reloaded successfully.');
+  console.log('Dynamic views reloaded successfully.');
 }
 
 function showTab(tab) {
@@ -260,26 +214,16 @@ function showKeyboardView() {
   if (!keyboardVisible) {
     console.log('Showing keyboard view');
     
-    // Reset keyboard to default state
     if (keyboardView && keyboardView.webContents) {
-      keyboardView.webContents.executeJavaScript(`
-        if (window.showKeyboard) {
-          window.showKeyboard();
-        }
-      `).catch(e => console.error('Failed to reset keyboard:', e));
+      keyboardView.webContents.executeJavaScript('window.showKeyboard && window.showKeyboard()').catch(e => console.error('Failed to reset keyboard:', e));
     }
     
-    mainWindow.addBrowserView(keyboardView);
     keyboardVisible = true;
     
-    // Apply custom styles
     applyKeyboardStyle();
-
-    // Initial layout with default height
-    showTab(currentView);
-    updateKeyboardBounds();
+    showTab(currentView); // This will resize the main view
+    updateKeyboardBounds(); // This will position the keyboard correctly
     
-    // Measure actual height after a delay to ensure DOM is ready
     setTimeout(() => {
       measureKeyboardHeight();
     }, 100);
@@ -289,13 +233,14 @@ function showKeyboardView() {
 function hideKeyboardView() {
   if (keyboardVisible) {
     console.log('Hiding keyboard view');
-    try { 
-      mainWindow.removeBrowserView(keyboardView); 
-    } catch(e) {
-      console.error('Error removing keyboard view:', e);
-    }
     keyboardVisible = false;
     
+    // Move keyboard off-screen instead of removing it
+    if (mainWindow && keyboardView) {
+      const [w, h] = mainWindow.getSize();
+      keyboardView.setBounds({ x: 0, y: h, width: w, height: keyboardActualHeight });
+    }
+
     // Update layout without keyboard
     showTab(currentView);
   }
@@ -709,27 +654,32 @@ ipcMain.handle('get-settings', async () => {
 });
 
 ipcMain.on('save-settings', async (event, settings) => {
-  console.log('Saving settings and reloading UI...');
+  console.log('Saving settings and reloading dynamic views...');
   store.set('volume', settings.volume);
   store.set('keyboard.width', settings.keyboardWidth);
   store.set('keyboard.keyHeight', settings.keyHeight);
   store.set('keyboard.layout', settings.keyboardLayout);
   store.set('tabs', settings.tabs);
 
-  // Apply non-UI-reload settings immediately
+  // Apply settings that don't require a reload
   applySettings();
 
-  // Reload the entire UI to apply all changes
-  await reloadUI();
+  // Crucially, reload the dynamic views to apply changes
+  await reloadDynamicViews();
 
-  // Exit settings view after reload is complete
-  if (previousView) {
+  // After the reload is complete, switch back to the previous view
+  if (previousView && views[previousView]) {
     showTab(previousView);
-    previousView = null; // Reset previous view
+  } else {
+    // Fallback to the first available tab if the previous one is gone
+    const firstTab = Object.keys(views).find(k => k.startsWith('tab'));
+    showTab(firstTab || null);
   }
+
+  previousView = null; // Reset state
   hideKeyboardView();
   autoCloseEnabled = true;
-  console.log('Settings saved and UI reloaded.');
+  console.log('Settings saved and dynamic views reloaded successfully.');
 });
 
 ipcMain.on('set-cursor-visibility', (event, visible) => {
