@@ -75,14 +75,30 @@
     const saveBtn = document.getElementById('saveBtn');
     const closeBtn = document.getElementById('closeBtn');
 
+    function sendLiveUpdate() {
+      if (window.electronAPI && window.electronAPI.updateKeyboardStyleLive) {
+        const style = {
+          width: keyboardWidthSlider.value,
+          keyHeight: keyHeightSlider.value,
+        };
+        window.electronAPI.updateKeyboardStyleLive(style);
+      }
+    }
+
     // Load saved settings
     if (window.electronAPI && window.electronAPI.getSettings) {
       window.electronAPI.getSettings().then(settings => {
-        if (settings.volume) volumeSlider.value = settings.volume;
-        if (settings.keyboardWidth) keyboardWidthSlider.value = settings.keyboardWidth;
-        if (settings.keyHeight) keyHeightSlider.value = settings.keyHeight;
+        if (settings) {
+          if (settings.volume) volumeSlider.value = settings.volume;
+          if (settings.keyboardWidth) keyboardWidthSlider.value = settings.keyboardWidth;
+          if (settings.keyHeight) keyHeightSlider.value = settings.keyHeight;
+        }
       });
     }
+
+    // Add listeners for live updates
+    keyboardWidthSlider.addEventListener('input', sendLiveUpdate);
+    keyHeightSlider.addEventListener('input', sendLiveUpdate);
 
     saveBtn.addEventListener('click', () => {
       const settings = {

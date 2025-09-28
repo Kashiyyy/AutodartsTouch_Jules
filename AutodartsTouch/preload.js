@@ -32,5 +32,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   getSettings: () => ipcRenderer.invoke('get-settings'),
   saveSettings: (settings) => ipcRenderer.send('save-settings', settings),
-  closeSettings: () => ipcRenderer.send('close-settings')
+  closeSettings: () => ipcRenderer.send('close-settings'),
+  updateKeyboardStyleLive: (style) => ipcRenderer.send('update-keyboard-style-live', style)
 });

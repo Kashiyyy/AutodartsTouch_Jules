@@ -9,8 +9,9 @@ let mainWindow;
 let views = {};
 let toolbarView;
 let keyboardView;
-let settingsWindow = null;
+let settingsView;
 let currentView = 'tab1';
+let previousView = null;
 
 const TOOLBAR_HEIGHT = 72;
 const KEYBOARD_HEIGHT = 300;
@@ -35,12 +36,14 @@ function createWindow() {
   });
 
   // Content BrowserViews
-  views.tab1 = new BrowserView({ webPreferences: { sandbox: false } });
-  views.tab2 = new BrowserView({ webPreferences: { sandbox: false } });
+  views.tab1 = new BrowserView({ webPreferences: { sandbox: false, preload: path.join(__dirname, 'preload.js') } });
+  views.tab2 = new BrowserView({ webPreferences: { sandbox: false, preload: path.join(__dirname, 'preload.js') } });
+  settingsView = new BrowserView({ webPreferences: { sandbox: false, preload: path.join(__dirname, 'preload.js') } });
 
   // primary content (tab1) and your original service (tab2)
   views.tab1.webContents.loadURL('https://play.autodarts.io/').catch(e => console.error('tab1 load', e));
   views.tab2.webContents.loadURL('http://localhost:3180/').catch(e => console.error('tab2 load', e));
+  settingsView.webContents.loadFile(path.join(__dirname, 'settings.html')).catch(e => console.error('settings load', e));
 
   // Toolbar view
   toolbarView = new BrowserView({
@@ -57,6 +60,7 @@ function createWindow() {
   // Add main content and toolbar (keyboard not added yet)
   mainWindow.addBrowserView(views.tab1);
   mainWindow.addBrowserView(views.tab2);
+  mainWindow.addBrowserView(settingsView);
   mainWindow.addBrowserView(toolbarView);
 
   showTab(currentView);
@@ -111,6 +115,13 @@ function showTab(tab) {
       v.setAutoResize({ width: true, height: true });
     }
   });
+
+  if (tab === 'settings') {
+    settingsView.setBounds({ x: 0, y: TOOLBAR_HEIGHT, width: w, height: availableHeight });
+    settingsView.setAutoResize({ width: true, height: true });
+  } else {
+    settingsView.setBounds({ x: 0, y: h, width: w, height: availableHeight });
+  }
 
   try {
     toolbarView.setBounds({ x: 0, y: 0, width: w, height: TOOLBAR_HEIGHT });
@@ -247,34 +258,6 @@ function toggleKeyboardView() {
   }
 }
 
-function createSettingsWindow() {
-  if (settingsWindow) {
-    settingsWindow.focus();
-    return;
-  }
-  settingsWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
-    parent: mainWindow,
-    modal: true,
-    show: false,
-    frame: false,
-    transparent: true,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      sandbox: false,
-    }
-  });
-  settingsWindow.loadFile(path.join(__dirname, 'settings.html'));
-  settingsWindow.once('ready-to-show', () => {
-    settingsWindow.show();
-  });
-  settingsWindow.on('closed', () => {
-    settingsWindow = null;
-  });
-}
-
 function applySettings() {
   const volume = store.get('volume', 50);
 
@@ -291,9 +274,9 @@ function applySettings() {
   applyKeyboardStyle();
 }
 
-function applyKeyboardStyle() {
-  const keyboardWidth = store.get('keyboard.width', 100);
-  const keyHeight = store.get('keyboard.keyHeight', 50);
+function applyKeyboardStyle(style) {
+  const keyboardWidth = style ? style.width : store.get('keyboard.width', 100);
+  const keyHeight = style ? style.keyHeight : store.get('keyboard.keyHeight', 50);
 
   if (keyboardView && keyboardView.webContents) {
     const sendStyle = () => {
@@ -497,10 +480,37 @@ function setupAutoKeyboard() {
 }
 
 // IPC
-ipcMain.on('open-settings', createSettingsWindow);
-ipcMain.on('switch-tab', (ev, tab) => { if (tab && views[tab]) showTab(tab); });
-ipcMain.on('refresh', () => { if (views[currentView]) views[currentView].webContents.reload(); });
-ipcMain.on('toggle-webkeyboard', () => { toggleKeyboardView(); });
+ipcMain.on('open-settings', () => {
+  if (currentView !== 'settings') {
+    previousView = currentView;
+    showTab('settings');
+    showKeyboardView();
+    autoCloseEnabled = false; // Disable auto-close while in settings
+  }
+});
+ipcMain.on('switch-tab', (ev, tab) => {
+  if (tab && views[tab]) {
+    // When switching away from settings, hide keyboard and restore defaults
+    if (currentView === 'settings' && tab !== 'settings') {
+      applySettings(); // Restore non-live settings
+      hideKeyboardView();
+      autoCloseEnabled = true; // Re-enable auto-close
+    }
+    showTab(tab);
+  }
+});
+ipcMain.on('refresh', () => {
+  const view = (currentView === 'settings') ? settingsView : views[currentView];
+  if (view) view.webContents.reload();
+});
+ipcMain.on('toggle-webkeyboard', () => {
+  // Prevent hiding the keyboard while in the settings view
+  if (currentView === 'settings') {
+    showKeyboardView();
+    return;
+  }
+  toggleKeyboardView();
+});
 
 ipcMain.handle('get-settings', async () => {
   return {
@@ -514,16 +524,30 @@ ipcMain.on('save-settings', (event, settings) => {
   store.set('volume', settings.volume);
   store.set('keyboard.width', settings.keyboardWidth);
   store.set('keyboard.keyHeight', settings.keyHeight);
-  applySettings();
-  if (settingsWindow) {
-    settingsWindow.close();
+
+  applySettings(); // Apply and save the settings
+
+  if (previousView) {
+    showTab(previousView);
   }
+  hideKeyboardView();
+  autoCloseEnabled = true;
 });
 
 ipcMain.on('close-settings', () => {
-  if (settingsWindow) {
-    settingsWindow.close();
+  // Restore original settings from store before closing, discarding any live changes
+  applySettings();
+
+  if (previousView) {
+    showTab(previousView);
   }
+  hideKeyboardView();
+  autoCloseEnabled = true;
+});
+
+// For live preview of keyboard settings
+ipcMain.on('update-keyboard-style-live', (event, style) => {
+  applyKeyboardStyle(style);
 });
 
 // Keyboard height update from keyboard view
