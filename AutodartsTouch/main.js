@@ -593,19 +593,32 @@ ipcMain.on('power-control', (event, action) => {
 });
 
 ipcMain.handle('get-keyboard-layouts', async () => {
-    // This is the correct path, relative to the main.js file.
-    const layoutDir = path.join(__dirname, 'keyboard', 'layouts');
-    console.log(`Attempting to read keyboard layouts from: ${layoutDir}`);
-    try {
-        const files = await fs.promises.readdir(layoutDir);
-        console.log(`Found layout files: ${files}`);
-        return files
-            .filter(file => file.endsWith('.js'))
-            .map(file => file.replace('.js', ''));
-    } catch (error) {
-        console.error(`FATAL: Failed to read keyboard layouts from ${layoutDir}. This is a critical error.`, error);
-        return []; // Return empty array on error to prevent crashing the settings page.
+  // Use app.getAppPath() to get the base directory of the app, which is more reliable.
+  // Works both in development (where it's the project root) and in a packaged app.
+  const layoutDir = path.join(app.getAppPath(), 'AutodartsTouch', 'keyboard', 'layouts');
+  console.log(`Attempting to read keyboard layouts from: ${layoutDir}`);
+  try {
+    // Check if the directory exists before attempting to read it.
+    if (!fs.existsSync(layoutDir)) {
+      console.error(`FATAL: Keyboard layout directory does not exist at ${layoutDir}.`);
+      // Try an alternative path for development, if needed.
+      const devLayoutDir = path.join(__dirname, 'keyboard', 'layouts');
+      if (fs.existsSync(devLayoutDir)) {
+        console.log(`Found layout directory at alternative path: ${devLayoutDir}`);
+        const files = await fs.promises.readdir(devLayoutDir);
+        return files.filter(file => file.endsWith('.js')).map(file => file.replace('.js', ''));
+      }
+      return [];
     }
+    const files = await fs.promises.readdir(layoutDir);
+    console.log(`Found layout files: ${files}`);
+    return files
+      .filter(file => file.endsWith('.js'))
+      .map(file => file.replace('.js', ''));
+  } catch (error) {
+    console.error(`FATAL: Failed to read keyboard layouts from ${layoutDir}. This is a critical error.`, error);
+    return []; // Return empty array on error to prevent crashing the settings page.
+  }
 });
 
 ipcMain.handle('get-settings', async () => {
@@ -622,20 +635,20 @@ ipcMain.handle('get-settings', async () => {
 });
 
 ipcMain.on('save-settings', async (event, settings) => {
-  console.log('Saving settings and reloading dynamic views...');
+  console.log('Saving settings...');
   store.set('volume', settings.volume);
   store.set('keyboard.width', settings.keyboardWidth);
   store.set('keyboard.keyHeight', settings.keyHeight);
   store.set('keyboard.layout', settings.keyboardLayout);
   store.set('tabs', settings.tabs);
 
-  // Apply settings that don't require a reload
+  // Apply settings that can be changed live
   applySettings();
 
-  // Crucially, reload the dynamic views to apply changes
-  await reloadDynamicViews();
+  // NOTE: The call to reloadDynamicViews() has been removed to prevent a crash.
+  // A restart is required for Tab and Keyboard Layout changes to take effect.
 
-  // After the reload is complete, switch back to the previous view
+  // After saving, switch back to the previous view
   if (previousView && views[previousView]) {
     showTab(previousView);
   } else {
@@ -647,7 +660,7 @@ ipcMain.on('save-settings', async (event, settings) => {
   previousView = null; // Reset state
   hideKeyboardView();
   autoCloseEnabled = true;
-  console.log('Settings saved and dynamic views reloaded successfully.');
+  console.log('Settings saved. A restart may be needed for some changes.');
 });
 
 ipcMain.on('set-cursor-visibility', (event, visible) => {
