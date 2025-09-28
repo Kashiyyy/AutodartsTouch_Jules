@@ -14,7 +14,6 @@ let settingsView;
 let powerMenuView;
 let currentView = 'tab0'; // Default to the first tab
 let previousView = null;
-let isCursorHidden = false;
 
 const TOOLBAR_HEIGHT = 72;
 const KEYBOARD_HEIGHT = 300;
@@ -23,7 +22,7 @@ let shiftActive = false;
 let keyboardActualHeight = 300; // Dynamic keyboard height
 let autoCloseEnabled = true; // Option to disable auto-close
 
-function createWindow() {
+async function createWindow() {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
 
   mainWindow = new BrowserWindow({
@@ -38,37 +37,11 @@ function createWindow() {
     }
   });
 
-  // Load tab settings from store
-  const tabs = store.get('tabs', [
-    { name: 'Autodarts', url: 'https://play.autodarts.io/' },
-    { name: 'Service', url: 'http://localhost:3180/' }
-  ]);
-
-  createTabViews();
-
-  // Settings view
+  // Create static views first
   settingsView = new BrowserView({ webPreferences: { sandbox: false, preload: path.join(__dirname, 'preload.js') } });
   settingsView.webContents.loadFile(path.join(__dirname, 'settings.html')).catch(e => console.error('settings load', e));
   mainWindow.addBrowserView(settingsView);
 
-  // Toolbar view
-  toolbarView = new BrowserView({
-    webPreferences: { contextIsolation: true, sandbox: false, preload: path.join(__dirname, 'preload.js') }
-  });
-  toolbarView.webContents.loadFile(path.join(__dirname, 'index.html')).catch(e => console.error('toolbar load', e));
-  mainWindow.addBrowserView(toolbarView);
-
-  // Keyboard view
-  const keyboardLayout = store.get('keyboard.layout', 'de');
-  keyboardView = new BrowserView({
-    webPreferences: { contextIsolation: true, sandbox: false, preload: path.join(__dirname, 'preload.js') },
-    transparent: true
-  });
-  keyboardView.webContents.loadFile(path.join(__dirname, 'keyboard', 'index.html'), {
-    query: { layout: keyboardLayout }
-  }).catch(e => console.error('keyboard load', e));
-
-  // Power Menu view
   powerMenuView = new BrowserView({
     webPreferences: {
       contextIsolation: true,
@@ -79,6 +52,8 @@ function createWindow() {
   });
   powerMenuView.webContents.loadFile(path.join(__dirname, 'power-menu.html')).catch(e => console.error('power menu load', e));
 
+  // Create all the dynamic views and wait for them to load
+  await createAllViews();
 
   // Determine the initial tab to show
   const initialTab = Object.keys(views).length > 0 ? 'tab0' : null;
@@ -92,7 +67,7 @@ function createWindow() {
   setTimeout(() => {
     setupAutoKeyboard();
   }, 1000);
-  
+
   // Additional setup for localhost (might need more time to load)
   setTimeout(() => {
     console.log('Re-running auto-keyboard setup for localhost pages...');
@@ -106,6 +81,7 @@ function createWindow() {
 }
 
 function createTabViews() {
+  const loadingPromises = [];
   const tabs = store.get('tabs', [
     { name: 'Autodarts', url: 'https://play.autodarts.io/' },
     { name: 'Service', url: 'http://localhost:3180/' }
@@ -113,39 +89,105 @@ function createTabViews() {
 
   // Create BrowserViews for each configured tab
   tabs.forEach((tab, index) => {
-    if (tab.url) {
+    if (tab && tab.url && tab.url.trim() !== '') {
       const view = new BrowserView({ webPreferences: { sandbox: false, preload: path.join(__dirname, 'preload.js') } });
-      view.webContents.loadURL(tab.url).catch(e => console.error(`tab${index} load error:`, e));
       mainWindow.addBrowserView(view);
       views[`tab${index}`] = view;
+      // Add the promise to the array and catch individual errors so one failed tab doesn't block others
+      loadingPromises.push(view.webContents.loadURL(tab.url).catch(e => {
+        console.error(`tab${index} load error:`, e);
+      }));
     }
   });
+  return loadingPromises;
 }
 
-function reloadTabs() {
-  // Remove and destroy all existing views
-  Object.keys(views).forEach(k => {
-    const view = views[k];
-    if (view) {
-      mainWindow.removeBrowserView(view);
-      view.webContents.destroy();
+function createAllViews() {
+  const tabLoadingPromises = createTabViews(); // This populates `views` and returns promises
+
+  // Toolbar view
+  toolbarView = new BrowserView({
+    webPreferences: { contextIsolation: true, sandbox: false, preload: path.join(__dirname, 'preload.js') }
+  });
+  mainWindow.addBrowserView(toolbarView);
+
+  // Keyboard view
+  const keyboardLayout = store.get('keyboard.layout', 'de');
+  keyboardView = new BrowserView({
+    webPreferences: { contextIsolation: true, sandbox: false, preload: path.join(__dirname, 'preload.js') },
+    transparent: true
+  });
+
+  // Combine all loading promises
+  const allPromises = [
+    ...tabLoadingPromises,
+    toolbarView.webContents.loadFile(path.join(__dirname, 'index.html')),
+    keyboardView.webContents.loadFile(path.join(__dirname, 'keyboard', 'index.html'), {
+      query: { layout: keyboardLayout }
+    })
+  ];
+
+  return Promise.all(allPromises).catch(e => console.error('Error loading one or more views:', e));
+}
+
+async function reloadUI() {
+  console.log('Reloading entire UI...');
+  if (!mainWindow) return;
+
+  // 1. Destroy all existing dynamic views
+  const allViews = [
+    ...Object.values(views),
+    toolbarView,
+    keyboardView
+  ];
+
+  allViews.forEach(view => {
+    if (view && !view.webContents.isDestroyed()) {
+      try {
+        mainWindow.removeBrowserView(view);
+        view.webContents.destroy();
+      } catch (e) {
+        console.error('Error destroying a view:', e);
+      }
     }
   });
+
+  // 2. Reset view containers
   views = {};
+  toolbarView = null;
+  keyboardView = null;
+  keyboardVisible = false; // Reset keyboard state
 
-  // Re-create the views with new settings
-  createTabViews();
-
-  // Reload the toolbar to fetch new tabs
-  if (toolbarView) {
-    toolbarView.webContents.reload();
+  // 3. Re-create all views and wait for them to load
+  try {
+    await createAllViews();
+    console.log('All views finished loading after reload.');
+  } catch (error) {
+    console.error('An error occurred during UI reload:', error);
+    // In a real app, you might want to show an error message to the user here
   }
 
-  // Show the first tab by default
-  const initialTab = Object.keys(views).length > 0 ? 'tab0' : null;
-  if (initialTab) {
-    showTab(initialTab);
+  // 4. Determine initial tab and layout the UI
+  let firstAvailableTab = null;
+  for (let i = 0; i < 10; i++) { // Check for a reasonable number of tabs
+      if (views[`tab${i}`]) {
+          firstAvailableTab = `tab${i}`;
+          break;
+      }
   }
+
+  if (firstAvailableTab) {
+    currentView = firstAvailableTab;
+    showTab(firstAvailableTab);
+  } else {
+    // If no tabs exist, hide all other views to avoid a blank screen with artifacts
+    if(settingsView) settingsView.setBounds({ x: 0, y: mainWindow.getBounds().height, width: 1, height: 1 });
+    showTab(null);
+  }
+
+  // 5. Re-run setup
+  setupAutoKeyboard();
+  console.log('UI reloaded successfully.');
 }
 
 function showTab(tab) {
@@ -590,34 +632,34 @@ ipcMain.on('toggle-webkeyboard', () => {
 
 ipcMain.on('open-power-menu', () => {
     if (mainWindow && powerMenuView) {
+        // Apply blur to all other views
         const allViews = [...Object.values(views), toolbarView, settingsView, keyboardView];
         allViews.forEach(view => {
             if (view && view.webContents && !view.webContents.isDestroyed()) {
-                view.webContents.insertCSS('html { filter: blur(5px); }').catch(e => console.error(`Failed to apply blur: ${e}`));
+                view.webContents.insertCSS('html { filter: blur(5px) !important; }').catch(e => console.error(`Failed to apply blur: ${e}`));
             }
         });
 
-        mainWindow.addBrowserView(powerMenuView);
+        // Ensure power menu is on top
+        mainWindow.setTopBrowserView(powerMenuView);
         const [w, h] = mainWindow.getSize();
         powerMenuView.setBounds({ x: 0, y: 0, width: w, height: h });
-        mainWindow.setTopBrowserView(powerMenuView);
     }
 });
 
 ipcMain.on('close-power-menu', () => {
     if (mainWindow && powerMenuView) {
+        // Remove blur from all other views
         const allViews = [...Object.values(views), toolbarView, settingsView, keyboardView];
         allViews.forEach(view => {
             if (view && view.webContents && !view.webContents.isDestroyed()) {
-                view.webContents.insertCSS('html { filter: initial; }').catch(e => console.error(`Failed to remove blur: ${e}`));
+                view.webContents.insertCSS('html { filter: none !important; }').catch(e => console.error(`Failed to remove blur: ${e}`));
             }
         });
 
-        try {
-            mainWindow.removeBrowserView(powerMenuView);
-        } catch (e) {
-            console.error('Failed to remove power menu view:', e);
-        }
+        // Hide the power menu by moving it off-screen
+        const [w, h] = mainWindow.getSize();
+        powerMenuView.setBounds({ x: 0, y: h, width: w, height: h });
     }
 });
 
@@ -666,29 +708,28 @@ ipcMain.handle('get-settings', async () => {
   };
 });
 
-ipcMain.on('save-settings', (event, settings) => {
+ipcMain.on('save-settings', async (event, settings) => {
+  console.log('Saving settings and reloading UI...');
   store.set('volume', settings.volume);
   store.set('keyboard.width', settings.keyboardWidth);
   store.set('keyboard.keyHeight', settings.keyHeight);
   store.set('keyboard.layout', settings.keyboardLayout);
   store.set('tabs', settings.tabs);
 
-  applySettings(); // Apply volume and some keyboard settings
+  // Apply non-UI-reload settings immediately
+  applySettings();
 
-  // Reload keyboard view with new layout
-  if (keyboardView && keyboardView.webContents) {
-      const newLayout = store.get('keyboard.layout', 'de');
-      keyboardView.webContents.loadFile(path.join(__dirname, 'keyboard', 'index.html'), {
-          query: { layout: newLayout }
-      }).catch(e => console.error('keyboard reload failed', e));
+  // Reload the entire UI to apply all changes
+  await reloadUI();
+
+  // Exit settings view after reload is complete
+  if (previousView) {
+    showTab(previousView);
+    previousView = null; // Reset previous view
   }
-
-  // Reload tabs dynamically to apply changes
-  reloadTabs();
-
-  // Exit settings view
   hideKeyboardView();
   autoCloseEnabled = true;
+  console.log('Settings saved and UI reloaded.');
 });
 
 ipcMain.on('set-cursor-visibility', (event, visible) => {

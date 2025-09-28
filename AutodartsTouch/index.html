@@ -95,74 +95,59 @@ button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 a
     }
   }
 
-  document.addEventListener('DOMContentLoaded', generateTabs);
+  document.addEventListener('DOMContentLoaded', () => {
+    generateTabs();
 
-  const webVKBtn = document.getElementById('webVKBtn');
-  webVKBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); if (window.api && window.api.toggleWebKeyboard) window.api.toggleWebKeyboard(); });
-  webVKBtn.addEventListener('click', (e) => e.preventDefault());
+    const webVKBtn = document.getElementById('webVKBtn');
+    webVKBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); if (window.api && window.api.toggleWebKeyboard) window.api.toggleWebKeyboard(); });
+    webVKBtn.addEventListener('click', (e) => e.preventDefault());
 
-  const settingsBtn = document.getElementById('settingsBtn');
-  settingsBtn.addEventListener('click', () => {
-    if (window.api && window.api.openSettings) {
-      window.api.openSettings();
-    }
+    const settingsBtn = document.getElementById('settingsBtn');
+    settingsBtn.addEventListener('click', () => {
+        if (window.api && window.api.openSettings) {
+        window.api.openSettings();
+        }
+    });
+
+    const refreshBtn = document.getElementById('refreshBtn');
+    let pressTimer = null;
+
+    refreshBtn.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        pressTimer = window.setTimeout(() => {
+        if (window.api && window.api.forceReload) {
+            window.api.forceReload();
+        }
+        pressTimer = null;
+        }, 800); // 800ms for long press
+    });
+
+    refreshBtn.addEventListener('pointerup', (e) => {
+        e.preventDefault();
+        if (pressTimer) {
+        clearTimeout(pressTimer);
+        pressTimer = null;
+        if (window.api && window.api.refresh) {
+            window.api.refresh();
+        }
+        }
+    });
+
+    refreshBtn.addEventListener('pointerleave', () => {
+        if (pressTimer) {
+        clearTimeout(pressTimer);
+        pressTimer = null;
+        }
+    });
+
+    const powerBtn = document.getElementById('powerBtn');
+    powerBtn.addEventListener('click', () => {
+        if (window.api && window.api.openPowerMenu) {
+            window.api.openPowerMenu();
+        }
+    });
   });
 
-  const refreshBtn = document.getElementById('refreshBtn');
-  let pressTimer = null;
-
-  refreshBtn.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    pressTimer = window.setTimeout(() => {
-      if (window.api && window.api.forceReload) {
-        window.api.forceReload();
-      }
-      pressTimer = null;
-    }, 800); // 800ms for long press
-  });
-
-  refreshBtn.addEventListener('pointerup', (e) => {
-    e.preventDefault();
-    if (pressTimer) {
-      clearTimeout(pressTimer);
-      pressTimer = null;
-      if (window.api && window.api.refresh) {
-        window.api.refresh();
-      }
-    }
-  });
-
-  refreshBtn.addEventListener('pointerleave', () => {
-    if (pressTimer) {
-      clearTimeout(pressTimer);
-      pressTimer = null;
-    }
-  });
-
-  const powerBtn = document.getElementById('powerBtn');
-  powerBtn.addEventListener('click', () => {
-    if (window.api && window.api.openPowerMenu) {
-        window.api.openPowerMenu();
-    }
-  });
-
-  // --- Cursor Visibility Logic ---
-  let isTouch = false; // To track the last used input method
-  let cursorVisible = true; // Initial state
-
-  window.addEventListener('pointerdown', (e) => {
-    if (e.pointerType === 'touch' && cursorVisible) {
-      if (window.api && window.api.setCursorVisibility) {
-        window.api.setCursorVisibility(false);
-        cursorVisible = false;
-      }
-    } else if (e.pointerType === 'mouse' && !cursorVisible) {
-      if (window.api && window.api.setCursorVisibility) {
-        window.api.setCursorVisibility(true);
-        cursorVisible = true;
-      }
-    }
-  }, true); // Use capture to get the event early
 </script>
 </body>
 </html>
