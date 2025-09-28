@@ -91,9 +91,8 @@ function createDynamicViews() {
     transparent: true
   });
   mainWindow.addBrowserView(keyboardView);
-  loadingPromises.push(keyboardView.webContents.loadFile(path.join(__dirname, 'keyboard', 'index.html'), {
-    query: { layout: keyboardLayout }
-  }));
+  // The keyboard now fetches its own layout, so we don't need to pass it as a query param.
+  loadingPromises.push(keyboardView.webContents.loadFile(path.join(__dirname, 'keyboard', 'index.html')));
 
   return Promise.all(loadingPromises).catch(e => console.error('Error loading one or more dynamic views:', e));
 }

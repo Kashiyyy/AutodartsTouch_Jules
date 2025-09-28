@@ -627,8 +627,19 @@
 
     // --- Initialization ---
     async function initializeKeyboard() {
-      const urlParams = new URLSearchParams(window.location.search);
-      let layoutName = urlParams.get('layout') || 'de';
+      let layoutName = 'de'; // Default layout
+      try {
+        // Actively fetch settings to get the correct layout, instead of relying on query params
+        const settings = await window.electronAPI.getSettings();
+        if (settings && settings.keyboardLayout) {
+          layoutName = settings.keyboardLayout;
+          console.log(`Received layout from settings: ${layoutName}`);
+        } else {
+          console.log('No layout in settings, using default.');
+        }
+      } catch (e) {
+        console.error("Could not fetch settings, falling back to default layout.", e);
+      }
 
       try {
         await loadLayout(layoutName);
