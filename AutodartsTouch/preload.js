@@ -12,7 +12,7 @@ contextBridge.exposeInMainWorld('api', {
   refresh: () => ipcRenderer.send('refresh'),
   forceReload: () => ipcRenderer.send('force-reload'),
   toggleWebKeyboard: () => ipcRenderer.send('toggle-webkeyboard'),
-  notifyTouchUsed: () => ipcRenderer.send('notify-touch-used'),
+  setCursorVisibility: (visible) => ipcRenderer.send('set-cursor-visibility', visible),
   openPowerMenu: () => ipcRenderer.send('open-power-menu'),
   closePowerMenu: () => ipcRenderer.send('close-power-menu'),
   powerControl: (action) => ipcRenderer.send('power-control', action),

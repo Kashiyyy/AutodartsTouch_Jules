@@ -153,6 +153,7 @@ download_file "$GITHUB_RAW_URL/AutodartsTouch/main.js" "$APP_DIR/main.js"
 download_file "$GITHUB_RAW_URL/AutodartsTouch/preload.js" "$APP_DIR/preload.js"
 download_file "$GITHUB_RAW_URL/AutodartsTouch/index.html" "$APP_DIR/index.html"
 download_file "$GITHUB_RAW_URL/AutodartsTouch/settings.html" "$APP_DIR/settings.html"
+download_file "$GITHUB_RAW_URL/AutodartsTouch/power-menu.html" "$APP_DIR/power-menu.html"
 download_file "$GITHUB_RAW_URL/AutodartsTouch/AutodartsTouch.sh" "$START_SCRIPT"
 chmod +x "$START_SCRIPT"
 

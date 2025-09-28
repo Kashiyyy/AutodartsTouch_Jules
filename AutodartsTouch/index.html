@@ -146,6 +146,23 @@ button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 a
     }
   });
 
+  // --- Cursor Visibility Logic ---
+  let isTouch = false; // To track the last used input method
+  let cursorVisible = true; // Initial state
+
+  window.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch' && cursorVisible) {
+      if (window.api && window.api.setCursorVisibility) {
+        window.api.setCursorVisibility(false);
+        cursorVisible = false;
+      }
+    } else if (e.pointerType === 'mouse' && !cursorVisible) {
+      if (window.api && window.api.setCursorVisibility) {
+        window.api.setCursorVisibility(true);
+        cursorVisible = true;
+      }
+    }
+  }, true); // Use capture to get the event early
 </script>
 </body>
 </html>

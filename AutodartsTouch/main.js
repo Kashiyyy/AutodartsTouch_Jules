@@ -49,7 +49,6 @@ function createWindow() {
   settingsView = new BrowserView({ webPreferences: { sandbox: false, preload: path.join(__dirname, 'preload.js') } });
   settingsView.webContents.loadFile(path.join(__dirname, 'settings.html')).catch(e => console.error('settings load', e));
   mainWindow.addBrowserView(settingsView);
-  injectTouchDetector(settingsView);
 
   // Toolbar view
   toolbarView = new BrowserView({
@@ -57,14 +56,12 @@ function createWindow() {
   });
   toolbarView.webContents.loadFile(path.join(__dirname, 'index.html')).catch(e => console.error('toolbar load', e));
   mainWindow.addBrowserView(toolbarView);
-  injectTouchDetector(toolbarView);
 
   // Keyboard view
   keyboardView = new BrowserView({
     webPreferences: { contextIsolation: true, sandbox: false, preload: path.join(__dirname, 'preload.js') }
   });
   keyboardView.webContents.loadFile(path.join(__dirname, 'keyboard', 'index.html')).catch(e => console.error('keyboard load', e));
-  injectTouchDetector(keyboardView);
 
   // Power Menu view
   powerMenuView = new BrowserView({
@@ -76,7 +73,6 @@ function createWindow() {
     transparent: true
   });
   powerMenuView.webContents.loadFile(path.join(__dirname, 'power-menu.html')).catch(e => console.error('power menu load', e));
-  injectTouchDetector(powerMenuView);
 
 
   // Determine the initial tab to show
@@ -117,7 +113,6 @@ function createTabViews() {
       view.webContents.loadURL(tab.url).catch(e => console.error(`tab${index} load error:`, e));
       mainWindow.addBrowserView(view);
       views[`tab${index}`] = view;
-      injectTouchDetector(view);
     }
   });
 }
@@ -355,33 +350,6 @@ function applyKeyboardStyle(style) {
       sendStyle();
     }
   }
-}
-
-function injectTouchDetector(view) {
-  if (!view || !view.webContents) return;
-
-  const script = `
-    (function() {
-      if (window.touchDetectorInstalled) return;
-      window.touchDetectorInstalled = true;
-
-      function onFirstTouch() {
-        if (window.api && window.api.notifyTouchUsed) {
-          console.log('Touch detected, notifying main process.');
-          window.api.notifyTouchUsed();
-        }
-        // Listener is automatically removed due to { once: true }
-      }
-
-      window.addEventListener('touchstart', onFirstTouch, { once: true, capture: true });
-    })();
-  `;
-
-  view.webContents.on('dom-ready', () => {
-    view.webContents.executeJavaScript(script).catch(e => {
-      console.error('Failed to inject touch detector for a view:', e);
-    });
-  });
 }
 
 function setupAutoKeyboard() {
@@ -695,63 +663,12 @@ ipcMain.on('save-settings', (event, settings) => {
   autoCloseEnabled = true;
 });
 
-ipcMain.on('notify-touch-used', () => {
-    if (isCursorHidden) return;
-    isCursorHidden = true;
-
-    console.log('Hiding cursor in all views and frames with MutationObserver.');
-
-    const script = `
-        (function() {
-            function hideCursorInDocument(doc) {
-                if (!doc || !doc.head) return;
-                if (doc.getElementById('hide-cursor-style')) return;
-                const style = doc.createElement('style');
-                style.id = 'hide-cursor-style';
-                style.innerHTML = '* { cursor: none !important; }';
-                doc.head.appendChild(style);
-            }
-
-            function observeDocument(doc) {
-                if (!doc || !doc.body) return;
-                const observer = new MutationObserver((mutations) => {
-                    mutations.forEach((mutation) => {
-                        mutation.addedNodes.forEach((node) => {
-                            if (node.tagName === 'IFRAME') {
-                                try {
-                                    node.addEventListener('load', () => {
-                                        traverseFrames(node.contentWindow);
-                                    }, { once: true });
-                                } catch (e) {
-                                    console.error('Could not add load listener to new iframe:', e);
-                                }
-                            }
-                        });
-                    });
-                });
-                observer.observe(doc.body, { childList: true, subtree: true });
-            }
-
-            function traverseFrames(win) {
-                try {
-                    hideCursorInDocument(win.document);
-                    observeDocument(win.document);
-                    for (let i = 0; i < win.frames.length; i++) {
-                        try {
-                            traverseFrames(win.frames[i]);
-                        } catch (e) { /* Cross-origin */ }
-                    }
-                } catch (e) { /* Cross-origin */ }
-            }
-
-            traverseFrames(window);
-        })();
-    `;
-
+ipcMain.on('set-cursor-visibility', (event, visible) => {
+    const css = `* { cursor: ${visible ? 'default' : 'none'} !important; }`;
     const allViews = [...Object.values(views), toolbarView, settingsView, keyboardView, powerMenuView];
     allViews.forEach(view => {
         if (view && view.webContents && !view.webContents.isDestroyed()) {
-            view.webContents.executeJavaScript(script).catch(e => console.error('Failed to execute cursor hiding script for a view:', e));
+            view.webContents.insertCSS(css).catch(e => console.error(`Failed to set cursor visibility for a view: ${e}`));
         }
     });
 });
