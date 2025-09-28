@@ -41,15 +41,7 @@ function createWindow() {
     { name: 'Service', url: 'http://localhost:3180/' }
   ]);
 
-  // Create BrowserViews for each configured tab
-  tabs.forEach((tab, index) => {
-    if (tab.url) {
-      const view = new BrowserView({ webPreferences: { sandbox: false, preload: path.join(__dirname, 'preload.js') } });
-      view.webContents.loadURL(tab.url).catch(e => console.error(`tab${index} load error:`, e));
-      mainWindow.addBrowserView(view);
-      views[`tab${index}`] = view;
-    }
-  });
+  createTabViews();
 
   // Settings view
   settingsView = new BrowserView({ webPreferences: { sandbox: false, preload: path.join(__dirname, 'preload.js') } });
@@ -92,6 +84,49 @@ function createWindow() {
     showTab(currentView);
     if (keyboardVisible) updateKeyboardBounds();
   });
+}
+
+function createTabViews() {
+  const tabs = store.get('tabs', [
+    { name: 'Autodarts', url: 'https://play.autodarts.io/' },
+    { name: 'Service', url: 'http://localhost:3180/' }
+  ]);
+
+  // Create BrowserViews for each configured tab
+  tabs.forEach((tab, index) => {
+    if (tab.url) {
+      const view = new BrowserView({ webPreferences: { sandbox: false, preload: path.join(__dirname, 'preload.js') } });
+      view.webContents.loadURL(tab.url).catch(e => console.error(`tab${index} load error:`, e));
+      mainWindow.addBrowserView(view);
+      views[`tab${index}`] = view;
+    }
+  });
+}
+
+function reloadTabs() {
+  // Remove and destroy all existing views
+  Object.keys(views).forEach(k => {
+    const view = views[k];
+    if (view) {
+      mainWindow.removeBrowserView(view);
+      view.webContents.destroy();
+    }
+  });
+  views = {};
+
+  // Re-create the views with new settings
+  createTabViews();
+
+  // Reload the toolbar to fetch new tabs
+  if (toolbarView) {
+    toolbarView.webContents.reload();
+  }
+
+  // Show the first tab by default
+  const initialTab = Object.keys(views).length > 0 ? 'tab0' : null;
+  if (initialTab) {
+    showTab(initialTab);
+  }
 }
 
 function showTab(tab) {
@@ -540,24 +575,14 @@ ipcMain.on('save-settings', (event, settings) => {
   store.set('keyboard.keyHeight', settings.keyHeight);
   store.set('tabs', settings.tabs);
 
-  applySettings(); // Apply and save the settings
+  applySettings(); // Apply volume and keyboard settings
 
-  // Inform the user that a restart is required for tab changes to take effect
-  // This is a simple way to handle dynamic view recreation
-  if (previousView) {
-    showTab(previousView);
-  }
+  // Reload tabs dynamically to apply changes
+  reloadTabs();
+
+  // Exit settings view
   hideKeyboardView();
   autoCloseEnabled = true;
-
-  // Optional: Add a dialog to inform the user about the restart.
-  const { dialog } = require('electron');
-  dialog.showMessageBox(mainWindow, {
-    type: 'info',
-    title: 'Einstellungen gespeichert',
-    message: 'Die Tab-Einstellungen wurden gespeichert. Bitte starten Sie die Anwendung neu, damit die Änderungen wirksam werden.',
-    buttons: ['OK']
-  });
 });
 
 ipcMain.handle('get-tabs', async () => {
