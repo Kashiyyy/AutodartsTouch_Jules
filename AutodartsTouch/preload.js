@@ -1,6 +1,13 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('api', {
+  on: (channel, callback) => {
+    const validChannels = ['update-keyboard-style'];
+    if (validChannels.includes(channel)) {
+      ipcRenderer.on(channel, (event, ...args) => callback(...args));
+    }
+  },
+  openSettings: () => ipcRenderer.send('open-settings'),
   switchTab: (t) => ipcRenderer.send('switch-tab', t),
   refresh: () => ipcRenderer.send('refresh'),
   toggleWebKeyboard: () => ipcRenderer.send('toggle-webkeyboard'),
@@ -22,5 +29,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   inputBlurred: () => {
     console.log('electronAPI.inputBlurred called'); 
     ipcRenderer.send('input-blurred');
-  }
+  },
+  getSettings: () => ipcRenderer.invoke('get-settings'),
+  saveSettings: (settings) => ipcRenderer.send('save-settings', settings)
 });

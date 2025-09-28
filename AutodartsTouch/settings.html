@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Einstellungen</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: 'Open Sans', sans-serif; background-color: #2d285b; color: #fff; padding: 20px; }
+    h1 { text-align: center; }
+    .setting { margin-bottom: 20px; }
+    label { display: block; margin-bottom: 5px; }
+    input[type="range"] { width: 100%; }
+    button { display: block; margin: 20px auto 0; padding: 10px 20px; font-size: 16px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Einstellungen</h1>
+
+  <div class="setting">
+    <label for="volume">Systemlautstärke</label>
+    <input type="range" id="volume" min="0" max="100" value="50">
+  </div>
+
+  <div class="setting">
+    <label for="keyboardWidth">Breite der Tastatur (%)</label>
+    <input type="range" id="keyboardWidth" min="50" max="100" value="100">
+  </div>
+
+  <div class="setting">
+    <label for="keyHeight">Höhe der Tasten (px)</label>
+    <input type="range" id="keyHeight" min="30" max="80" value="50">
+  </div>
+
+  <button id="saveBtn">Speichern</button>
+
+  <script>
+    const volumeSlider = document.getElementById('volume');
+    const keyboardWidthSlider = document.getElementById('keyboardWidth');
+    const keyHeightSlider = document.getElementById('keyHeight');
+    const saveBtn = document.getElementById('saveBtn');
+
+    // Load saved settings
+    if (window.electronAPI && window.electronAPI.getSettings) {
+      window.electronAPI.getSettings().then(settings => {
+        if (settings.volume) volumeSlider.value = settings.volume;
+        if (settings.keyboardWidth) keyboardWidthSlider.value = settings.keyboardWidth;
+        if (settings.keyHeight) keyHeightSlider.value = settings.keyHeight;
+      });
+    }
+
+    saveBtn.addEventListener('click', () => {
+      const settings = {
+        volume: volumeSlider.value,
+        keyboardWidth: keyboardWidthSlider.value,
+        keyHeight: keyHeightSlider.value
+      };
+      if (window.electronAPI && window.electronAPI.saveSettings) {
+        window.electronAPI.saveSettings(settings);
+      }
+    });
+  </script>
+</body>
+</html>

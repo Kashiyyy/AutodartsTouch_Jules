@@ -679,5 +679,23 @@
     window.addEventListener('blur', hideUmlautPopup);
     window.addEventListener('resize', hideUmlautPopup);
   </script>
+  <script>
+      if (window.api) {
+        window.api.on('update-keyboard-style', (style) => {
+          const styleElement = document.getElementById('dynamic-keyboard-style') || document.createElement('style');
+          styleElement.id = 'dynamic-keyboard-style';
+          styleElement.innerHTML = `
+            #keyboard {
+              width: ${style.width}%;
+              margin: 0 auto;
+            }
+            .hg-button {
+              height: ${style.keyHeight}px;
+            }
+          `;
+          document.head.appendChild(styleElement);
+        });
+      }
+  </script>
 </body>
 </html>

@@ -1,10 +1,15 @@
 const { app, BrowserWindow, BrowserView, ipcMain, screen } = require('electron');
 const path = require('path');
+const Store = require('electron-store');
+const { exec } = require('child_process');
+
+const store = new Store();
 
 let mainWindow;
 let views = {};
 let toolbarView;
 let keyboardView;
+let settingsWindow = null;
 let currentView = 'tab1';
 
 const TOOLBAR_HEIGHT = 72;
@@ -55,6 +60,8 @@ function createWindow() {
   mainWindow.addBrowserView(toolbarView);
 
   showTab(currentView);
+
+  applySettings();
 
   // Setup auto-keyboard after views are ready
   setTimeout(() => {
@@ -234,6 +241,56 @@ function toggleKeyboardView() {
     hideKeyboardView();
   } else {
     showKeyboardView();
+  }
+}
+
+function createSettingsWindow() {
+  if (settingsWindow) {
+    settingsWindow.focus();
+    return;
+  }
+  settingsWindow = new BrowserWindow({
+    width: 500,
+    height: 450,
+    parent: mainWindow,
+    modal: true,
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      sandbox: false,
+    }
+  });
+  settingsWindow.loadFile(path.join(__dirname, 'settings.html'));
+  settingsWindow.setMenuBarVisibility(false);
+  settingsWindow.once('ready-to-show', () => {
+    settingsWindow.show();
+  });
+  settingsWindow.on('closed', () => {
+    settingsWindow = null;
+  });
+}
+
+function applySettings() {
+  const volume = store.get('volume', 50);
+  const keyboardWidth = store.get('keyboard.width', 100);
+  const keyHeight = store.get('keyboard.keyHeight', 50);
+
+  // Set system volume
+  exec(`amixer -D pulse sset Master ${volume}%`, (error, stdout, stderr) => {
+    if (error) {
+      console.error(`exec error: ${error}`);
+      return;
+    }
+    console.log(`System volume set to ${volume}%`);
+  });
+
+  // Update keyboard style
+  if (keyboardView && keyboardView.webContents) {
+    keyboardView.webContents.send('update-keyboard-style', {
+      width: keyboardWidth,
+      keyHeight: keyHeight
+    });
   }
 }
 
@@ -424,9 +481,28 @@ function setupAutoKeyboard() {
 }
 
 // IPC
+ipcMain.on('open-settings', createSettingsWindow);
 ipcMain.on('switch-tab', (ev, tab) => { if (tab && views[tab]) showTab(tab); });
 ipcMain.on('refresh', () => { if (views[currentView]) views[currentView].webContents.reload(); });
 ipcMain.on('toggle-webkeyboard', () => { toggleKeyboardView(); });
+
+ipcMain.handle('get-settings', async () => {
+  return {
+    volume: store.get('volume', 50),
+    keyboardWidth: store.get('keyboard.width', 100),
+    keyHeight: store.get('keyboard.keyHeight', 50)
+  };
+});
+
+ipcMain.on('save-settings', (event, settings) => {
+  store.set('volume', settings.volume);
+  store.set('keyboard.width', settings.keyboardWidth);
+  store.set('keyboard.keyHeight', settings.keyHeight);
+  applySettings();
+  if (settingsWindow) {
+    settingsWindow.close();
+  }
+});
 
 // Keyboard height update from keyboard view
 ipcMain.on('keyboard-height-changed', (ev, height) => {
