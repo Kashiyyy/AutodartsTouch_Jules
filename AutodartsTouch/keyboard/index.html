@@ -206,9 +206,21 @@
         gap: 2px;
       }
     }
+    #notification-bar {
+      display: none;
+      background-color: #d4a017;
+      color: #000;
+      text-align: center;
+      padding: 4px;
+      font-size: 14px;
+      border-radius: 4px;
+      margin: 0 4px 6px 4px;
+      font-weight: 500;
+    }
   </style>
 </head>
 <body>
+  <div id="notification-bar"></div>
   <div id="keyboard"></div>
 
   <script>
@@ -625,35 +637,47 @@
       }
     };
 
+    function showNotification(message, isError = false) {
+      const bar = document.getElementById('notification-bar');
+      if (bar) {
+        bar.textContent = message;
+        bar.style.backgroundColor = isError ? '#e53935' : '#d4a017';
+        bar.style.color = '#ffffff';
+        bar.style.display = 'block';
+      }
+    }
+
     // --- Initialization ---
     async function initializeKeyboard() {
       let layoutName = 'de'; // Default layout
       try {
-        // Actively fetch settings to get the correct layout, instead of relying on query params
         const settings = await window.electronAPI.getSettings();
         if (settings && settings.keyboardLayout) {
           layoutName = settings.keyboardLayout;
-          console.log(`Received layout from settings: ${layoutName}`);
-        } else {
-          console.log('No layout in settings, using default.');
         }
       } catch (e) {
         console.error("Could not fetch settings, falling back to default layout.", e);
       }
 
       try {
+        // Try to load the desired layout.
         await loadLayout(layoutName);
       } catch (error) {
-        console.error(`Could not load layout '${layoutName}', falling back to 'de'.`);
+        // If it fails, show a notification and try to load the default 'de' layout.
+        console.error(`Could not load layout '${layoutName}', falling back to 'de'.`, error);
+        showNotification(`Could not load layout '${layoutName}'. Using default.`);
+
         try {
           await loadLayout('de');
         } catch (fallbackError) {
-          console.error("Fatal: Could not load the default 'de' layout. Keyboard will not function.");
-          return; // Stop execution if default layout fails
+          // If the default layout ALSO fails, show a fatal error.
+          console.error("Fatal: Could not load the default 'de' layout. Keyboard will not function.", fallbackError);
+          showNotification("FATAL: Could not load default layout. Keyboard disabled.", true);
+          return; // Stop execution.
         }
       }
 
-      // This code now only runs AFTER the layout has been successfully loaded.
+      // This code now only runs AFTER a layout has been successfully loaded.
       const keyboardInstance = createKeyboard();
 
       // Global functions for main process to call

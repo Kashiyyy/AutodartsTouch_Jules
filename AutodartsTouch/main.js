@@ -592,58 +592,53 @@ ipcMain.on('power-control', (event, action) => {
 });
 
 ipcMain.handle('get-keyboard-layouts', async () => {
-  // Use app.getAppPath() to get the base directory of the app, which is more reliable.
-  // Works both in development (where it's the project root) and in a packaged app.
-  const layoutDir = path.join(app.getAppPath(), 'AutodartsTouch', 'keyboard', 'layouts');
-  console.log(`Attempting to read keyboard layouts from: ${layoutDir}`);
+  const prodDir = path.join(app.getAppPath(), 'AutodartsTouch', 'keyboard', 'layouts');
+  const devDir = path.join(__dirname, 'keyboard', 'layouts');
+
+  let layoutDirToUse;
   try {
-    // Check if the directory exists before attempting to read it.
-    if (!fs.existsSync(layoutDir)) {
-      console.error(`FATAL: Keyboard layout directory does not exist at ${layoutDir}.`);
-      // Try an alternative path for development, if needed.
-      const devLayoutDir = path.join(__dirname, 'keyboard', 'layouts');
-      if (fs.existsSync(devLayoutDir)) {
-        console.log(`Found layout directory at alternative path: ${devLayoutDir}`);
-        const files = await fs.promises.readdir(devLayoutDir);
-        return files.filter(file => file.endsWith('.js')).map(file => file.replace('.js', ''));
-      }
-      return [];
-    }
-    const files = await fs.promises.readdir(layoutDir);
-    console.log(`Found layout files: ${files}`);
+    // Try accessing the production directory first. This is more robust than existsSync.
+    await fs.promises.access(prodDir);
+    layoutDirToUse = prodDir;
+  } catch (e) {
+    console.warn(`Production layout directory not found, falling back to development path.`);
+    layoutDirToUse = devDir;
+  }
+
+  try {
+    console.log(`Reading keyboard layouts from: ${layoutDirToUse}`);
+    const files = await fs.promises.readdir(layoutDirToUse);
     return files
       .filter(file => file.endsWith('.js'))
       .map(file => file.replace('.js', ''));
   } catch (error) {
-    console.error(`FATAL: Failed to read keyboard layouts from ${layoutDir}. This is a critical error.`, error);
-    return []; // Return empty array on error to prevent crashing the settings page.
+    console.error(`FATAL: Could not read keyboard layouts from ${layoutDirToUse}.`, error);
+    return [];
   }
 });
 
 ipcMain.handle('get-keyboard-layout-data', async (event, layoutName) => {
-  const safeLayoutName = layoutName.replace(/[^a-zA-Z0-9_-]/g, '');
+  const safeLayoutName = (layoutName || '').replace(/[^a-zA-Z0-9_-]/g, '');
   if (!safeLayoutName) {
-    console.error('Request for invalid layout name rejected.');
+    console.error('Request for invalid or empty layout name rejected.');
     return null;
   }
 
-  const layoutDir = path.join(app.getAppPath(), 'AutodartsTouch', 'keyboard', 'layouts');
-  const devLayoutDir = path.join(__dirname, 'keyboard', 'layouts');
-  const layoutFilePath = path.join(layoutDir, `${safeLayoutName}.js`);
-  const devLayoutFilePath = path.join(devLayoutDir, `${safeLayoutName}.js`);
+  const prodPath = path.join(app.getAppPath(), 'AutodartsTouch', 'keyboard', 'layouts', `${safeLayoutName}.js`);
+  const devPath = path.join(__dirname, 'keyboard', 'layouts', `${safeLayoutName}.js`);
 
   try {
-    if (fs.existsSync(layoutFilePath)) {
-      return await fs.promises.readFile(layoutFilePath, 'utf-8');
-    } else if (fs.existsSync(devLayoutFilePath)) {
-      return await fs.promises.readFile(devLayoutFilePath, 'utf-8');
-    } else {
-      console.error(`Layout file not found for: ${safeLayoutName}`);
+    // In a packaged app, asar archives can make existsSync unreliable.
+    // It's better to just try reading and catch the error.
+    return await fs.promises.readFile(prodPath, 'utf-8');
+  } catch (prodError) {
+    console.warn(`Could not read layout from production path '${prodPath}'. Falling back to dev path.`);
+    try {
+      return await fs.promises.readFile(devPath, 'utf-8');
+    } catch (devError) {
+      console.error(`FATAL: Could not read layout file from prod or dev path for '${safeLayoutName}'.`);
       return null;
     }
-  } catch (error) {
-    console.error(`Error reading layout file for ${safeLayoutName}:`, error);
-    return null;
   }
 });
 
