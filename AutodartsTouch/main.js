@@ -642,25 +642,28 @@ ipcMain.on('save-settings', async (event, settings) => {
   store.set('keyboard.layout', settings.keyboardLayout);
   store.set('tabs', settings.tabs);
 
-  // Apply settings that can be changed live
+  // Apply settings that don't require a reload
   applySettings();
 
-  // NOTE: The call to reloadDynamicViews() has been removed to prevent a crash.
-  // A restart is required for Tab and Keyboard Layout changes to take effect.
+  // Defer the reload to prevent the app from crashing.
+  // This gives the settings view time to close before views are recreated.
+  setTimeout(async () => {
+    await reloadDynamicViews();
 
-  // After saving, switch back to the previous view
-  if (previousView && views[previousView]) {
-    showTab(previousView);
-  } else {
-    // Fallback to the first available tab if the previous one is gone
-    const firstTab = Object.keys(views).find(k => k.startsWith('tab'));
-    showTab(firstTab || null);
-  }
+    // After the reload, switch back to the previous view or a fallback.
+    if (previousView && views[previousView]) {
+      showTab(previousView);
+    } else {
+      const firstTab = Object.keys(views).find(k => k.startsWith('tab'));
+      showTab(firstTab || null);
+    }
+    previousView = null;
+    autoCloseEnabled = true;
+    console.log('Settings saved and dynamic views reloaded successfully.');
+  }, 100); // A short delay is sufficient
 
-  previousView = null; // Reset state
+  // Hide the keyboard and settings view immediately.
   hideKeyboardView();
-  autoCloseEnabled = true;
-  console.log('Settings saved. A restart may be needed for some changes.');
 });
 
 ipcMain.on('set-cursor-visibility', (event, visible) => {

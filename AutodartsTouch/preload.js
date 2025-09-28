@@ -16,7 +16,6 @@ contextBridge.exposeInMainWorld('api', {
   openPowerMenu: () => ipcRenderer.send('open-power-menu'),
   closePowerMenu: () => ipcRenderer.send('close-power-menu'),
   powerControl: (action) => ipcRenderer.send('power-control', action),
-  getKeyboardLayouts: () => ipcRenderer.invoke('get-keyboard-layouts'),
   getTabs: () => ipcRenderer.invoke('get-tabs'),
   sendKey: (key) => ipcRenderer.send('webkeyboard-key', key),
   setShiftStatus: (isActive) => ipcRenderer.send('keyboard-shift-status', isActive),
@@ -27,16 +26,11 @@ contextBridge.exposeInMainWorld('api', {
   }
 });
 
-// API for webview content to communicate focus events
+// API for settings and other webviews
 contextBridge.exposeInMainWorld('electronAPI', {
-  inputFocused: () => {
-    console.log('electronAPI.inputFocused called');
-    ipcRenderer.send('input-focused');
-  },
-  inputBlurred: () => {
-    console.log('electronAPI.inputBlurred called'); 
-    ipcRenderer.send('input-blurred');
-  },
+  inputFocused: () => ipcRenderer.send('input-focused'),
+  inputBlurred: () => ipcRenderer.send('input-blurred'),
+  getKeyboardLayouts: () => ipcRenderer.invoke('get-keyboard-layouts'),
   getSettings: () => ipcRenderer.invoke('get-settings'),
   saveSettings: (settings) => ipcRenderer.send('save-settings', settings),
   closeSettings: () => ipcRenderer.send('close-settings'),
