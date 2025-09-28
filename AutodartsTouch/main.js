@@ -684,13 +684,38 @@ ipcMain.on('notify-touch-used', () => {
   if (isCursorHidden) return;
   isCursorHidden = true;
 
-  console.log('Hiding cursor in all views.');
-  const css = '* { cursor: none !important; }';
+  console.log('Hiding cursor in all views and frames.');
+
+  const script = `
+    (function() {
+      function hideCursorInDocument(doc) {
+        if (!doc || !doc.head) return;
+        if (doc.getElementById('hide-cursor-style')) return;
+        const style = doc.createElement('style');
+        style.id = 'hide-cursor-style';
+        style.innerHTML = '* { cursor: none !important; }';
+        doc.head.appendChild(style);
+      }
+
+      function traverseFrames(win) {
+        try {
+          hideCursorInDocument(win.document);
+          for (let i = 0; i < win.frames.length; i++) {
+            try {
+              traverseFrames(win.frames[i]);
+            } catch(e) { /* ignore cross-origin */ }
+          }
+        } catch (e) { /* ignore cross-origin */ }
+      }
+
+      traverseFrames(window);
+    })();
+  `;
 
   const allViews = [...Object.values(views), toolbarView, settingsView, keyboardView, powerMenuView];
   allViews.forEach(view => {
     if (view && view.webContents && !view.webContents.isDestroyed()) {
-      view.webContents.insertCSS(css).catch(e => console.error(`Failed to insert CSS for a view: ${e}`));
+      view.webContents.executeJavaScript(script).catch(e => console.error('Failed to execute cursor hiding script for a view:', e));
     }
   });
 });
