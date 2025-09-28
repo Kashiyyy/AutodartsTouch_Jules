@@ -1,6 +1,6 @@
 // German (de) keyboard layout
 
-const keyboardLayouts = {
+var keyboardLayouts = {
   default: [
     ['q', 'w', 'e', 'r', 't', 'z', 'u', 'i', 'o', 'p'],
     ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l'],
@@ -27,7 +27,7 @@ const keyboardLayouts = {
   ]
 };
 
-const umlautMappings = {
+var umlautMappings = {
   'a': ['\u00E4', '\u00E0', '\u00E1', '\u00E2', '\u00E3', '\u00E5'],
   'A': ['\u00C4', '\u00C0', '\u00C1', '\u00C2', '\u00C3', '\u00C5'],
   'o': ['\u00F6', '\u00F2', '\u00F3', '\u00F4', '\u00F5', '\u00F8'],
