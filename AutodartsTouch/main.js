@@ -592,27 +592,18 @@ ipcMain.on('power-control', (event, action) => {
 });
 
 ipcMain.handle('get-keyboard-layouts', async () => {
-  const prodDir = path.join(app.getAppPath(), 'AutodartsTouch', 'keyboard', 'layouts');
-  const devDir = path.join(__dirname, 'keyboard', 'layouts');
-
-  let layoutDirToUse;
+  // In an Electron app, `__dirname` correctly points to the directory of the current file.
+  // When packaged into an asar, this path allows fs to read directly from the archive.
+  // This is the most reliable way to access bundled resources.
+  const layoutDir = path.join(__dirname, 'keyboard', 'layouts');
   try {
-    // Try accessing the production directory first. This is more robust than existsSync.
-    await fs.promises.access(prodDir);
-    layoutDirToUse = prodDir;
-  } catch (e) {
-    console.warn(`Production layout directory not found, falling back to development path.`);
-    layoutDirToUse = devDir;
-  }
-
-  try {
-    console.log(`Reading keyboard layouts from: ${layoutDirToUse}`);
-    const files = await fs.promises.readdir(layoutDirToUse);
+    console.log(`Reading keyboard layouts from: ${layoutDir}`);
+    const files = await fs.promises.readdir(layoutDir);
     return files
       .filter(file => file.endsWith('.js'))
       .map(file => file.replace('.js', ''));
   } catch (error) {
-    console.error(`FATAL: Could not read keyboard layouts from ${layoutDirToUse}.`, error);
+    console.error(`FATAL: Could not read keyboard layouts from ${layoutDir}.`, error);
     return [];
   }
 });
@@ -624,21 +615,14 @@ ipcMain.handle('get-keyboard-layout-data', async (event, layoutName) => {
     return null;
   }
 
-  const prodPath = path.join(app.getAppPath(), 'AutodartsTouch', 'keyboard', 'layouts', `${safeLayoutName}.js`);
-  const devPath = path.join(__dirname, 'keyboard', 'layouts', `${safeLayoutName}.js`);
-
+  // This is the direct and most reliable path to the resource inside the application.
+  const layoutPath = path.join(__dirname, 'keyboard', 'layouts', `${safeLayoutName}.js`);
   try {
-    // In a packaged app, asar archives can make existsSync unreliable.
-    // It's better to just try reading and catch the error.
-    return await fs.promises.readFile(prodPath, 'utf-8');
-  } catch (prodError) {
-    console.warn(`Could not read layout from production path '${prodPath}'. Falling back to dev path.`);
-    try {
-      return await fs.promises.readFile(devPath, 'utf-8');
-    } catch (devError) {
-      console.error(`FATAL: Could not read layout file from prod or dev path for '${safeLayoutName}'.`);
-      return null;
-    }
+    console.log(`Reading layout file from: ${layoutPath}`);
+    return await fs.promises.readFile(layoutPath, 'utf-8');
+  } catch (error) {
+    console.error(`FATAL: Could not read layout file from ${layoutPath}.`, error);
+    return null;
   }
 });
 
