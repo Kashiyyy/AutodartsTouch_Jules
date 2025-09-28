@@ -10,8 +10,10 @@ let views = {};
 let toolbarView;
 let keyboardView;
 let settingsView;
+let powerMenuView;
 let currentView = 'tab0'; // Default to the first tab
 let previousView = null;
+let isCursorHidden = false;
 
 const TOOLBAR_HEIGHT = 72;
 const KEYBOARD_HEIGHT = 300;
@@ -47,6 +49,7 @@ function createWindow() {
   settingsView = new BrowserView({ webPreferences: { sandbox: false, preload: path.join(__dirname, 'preload.js') } });
   settingsView.webContents.loadFile(path.join(__dirname, 'settings.html')).catch(e => console.error('settings load', e));
   mainWindow.addBrowserView(settingsView);
+  injectTouchDetector(settingsView);
 
   // Toolbar view
   toolbarView = new BrowserView({
@@ -54,12 +57,27 @@ function createWindow() {
   });
   toolbarView.webContents.loadFile(path.join(__dirname, 'index.html')).catch(e => console.error('toolbar load', e));
   mainWindow.addBrowserView(toolbarView);
+  injectTouchDetector(toolbarView);
 
   // Keyboard view
   keyboardView = new BrowserView({
     webPreferences: { contextIsolation: true, sandbox: false, preload: path.join(__dirname, 'preload.js') }
   });
   keyboardView.webContents.loadFile(path.join(__dirname, 'keyboard', 'index.html')).catch(e => console.error('keyboard load', e));
+  injectTouchDetector(keyboardView);
+
+  // Power Menu view
+  powerMenuView = new BrowserView({
+    webPreferences: {
+      contextIsolation: true,
+      sandbox: false,
+      preload: path.join(__dirname, 'preload.js')
+    },
+    transparent: true
+  });
+  powerMenuView.webContents.loadFile(path.join(__dirname, 'power-menu.html')).catch(e => console.error('power menu load', e));
+  injectTouchDetector(powerMenuView);
+
 
   // Determine the initial tab to show
   const initialTab = Object.keys(views).length > 0 ? 'tab0' : null;
@@ -99,6 +117,7 @@ function createTabViews() {
       view.webContents.loadURL(tab.url).catch(e => console.error(`tab${index} load error:`, e));
       mainWindow.addBrowserView(view);
       views[`tab${index}`] = view;
+      injectTouchDetector(view);
     }
   });
 }
@@ -338,6 +357,33 @@ function applyKeyboardStyle(style) {
   }
 }
 
+function injectTouchDetector(view) {
+  if (!view || !view.webContents) return;
+
+  const script = `
+    (function() {
+      if (window.touchDetectorInstalled) return;
+      window.touchDetectorInstalled = true;
+
+      function onFirstTouch() {
+        if (window.api && window.api.notifyTouchUsed) {
+          console.log('Touch detected, notifying main process.');
+          window.api.notifyTouchUsed();
+        }
+        // Listener is automatically removed due to { once: true }
+      }
+
+      window.addEventListener('touchstart', onFirstTouch, { once: true, capture: true });
+    })();
+  `;
+
+  view.webContents.on('dom-ready', () => {
+    view.webContents.executeJavaScript(script).catch(e => {
+      console.error('Failed to inject touch detector for a view:', e);
+    });
+  });
+}
+
 function setupAutoKeyboard() {
   console.log('Setting up auto-keyboard functionality...');
   
@@ -569,6 +615,43 @@ ipcMain.on('toggle-webkeyboard', () => {
   toggleKeyboardView();
 });
 
+ipcMain.on('open-power-menu', () => {
+  if (mainWindow && powerMenuView) {
+    mainWindow.addBrowserView(powerMenuView);
+    const [w, h] = mainWindow.getSize();
+    powerMenuView.setBounds({ x: 0, y: 0, width: w, height: h });
+  }
+});
+
+ipcMain.on('close-power-menu', () => {
+  if (mainWindow && powerMenuView) {
+    try {
+      mainWindow.removeBrowserView(powerMenuView);
+    } catch (e) {
+      console.error('Failed to remove power menu view:', e);
+    }
+  }
+});
+
+ipcMain.on('power-control', (event, action) => {
+  // Add a layer of security/confirmation if needed in a real-world scenario
+  switch (action) {
+    case 'shutdown':
+      exec('shutdown -h now', (err) => {
+        if (err) console.error('Shutdown command failed:', err);
+      });
+      break;
+    case 'restart':
+      exec('reboot', (err) => {
+        if (err) console.error('Restart command failed:', err);
+      });
+      break;
+    case 'close-app':
+      app.quit();
+      break;
+  }
+});
+
 ipcMain.handle('get-settings', async () => {
   return {
     volume: store.get('volume', 50),
@@ -598,22 +681,18 @@ ipcMain.on('save-settings', (event, settings) => {
 });
 
 ipcMain.on('notify-touch-used', () => {
+  if (isCursorHidden) return;
+  isCursorHidden = true;
+
+  console.log('Hiding cursor in all views.');
   const css = '* { cursor: none !important; }';
-  // Apply to all views
-  Object.values(views).forEach(view => {
-    if (view && view.webContents) {
-      view.webContents.insertCSS(css);
+
+  const allViews = [...Object.values(views), toolbarView, settingsView, keyboardView, powerMenuView];
+  allViews.forEach(view => {
+    if (view && view.webContents && !view.webContents.isDestroyed()) {
+      view.webContents.insertCSS(css).catch(e => console.error(`Failed to insert CSS for a view: ${e}`));
     }
   });
-  if (toolbarView && toolbarView.webContents) {
-    toolbarView.webContents.insertCSS(css);
-  }
-  if (settingsView && settingsView.webContents) {
-    settingsView.webContents.insertCSS(css);
-  }
-  if (keyboardView && keyboardView.webContents) {
-    keyboardView.webContents.insertCSS(css);
-  }
 });
 
 ipcMain.handle('get-tabs', async () => {
