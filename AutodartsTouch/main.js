@@ -621,6 +621,33 @@ ipcMain.handle('get-keyboard-layouts', async () => {
   }
 });
 
+ipcMain.handle('get-keyboard-layout-data', async (event, layoutName) => {
+  const safeLayoutName = layoutName.replace(/[^a-zA-Z0-9_-]/g, '');
+  if (!safeLayoutName) {
+    console.error('Request for invalid layout name rejected.');
+    return null;
+  }
+
+  const layoutDir = path.join(app.getAppPath(), 'AutodartsTouch', 'keyboard', 'layouts');
+  const devLayoutDir = path.join(__dirname, 'keyboard', 'layouts');
+  const layoutFilePath = path.join(layoutDir, `${safeLayoutName}.js`);
+  const devLayoutFilePath = path.join(devLayoutDir, `${safeLayoutName}.js`);
+
+  try {
+    if (fs.existsSync(layoutFilePath)) {
+      return await fs.promises.readFile(layoutFilePath, 'utf-8');
+    } else if (fs.existsSync(devLayoutFilePath)) {
+      return await fs.promises.readFile(devLayoutFilePath, 'utf-8');
+    } else {
+      console.error(`Layout file not found for: ${safeLayoutName}`);
+      return null;
+    }
+  } catch (error) {
+    console.error(`Error reading layout file for ${safeLayoutName}:`, error);
+    return null;
+  }
+});
+
 ipcMain.handle('get-settings', async () => {
   return {
     volume: store.get('volume', 50),

@@ -31,6 +31,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   inputFocused: () => ipcRenderer.send('input-focused'),
   inputBlurred: () => ipcRenderer.send('input-blurred'),
   getKeyboardLayouts: () => ipcRenderer.invoke('get-keyboard-layouts'),
+  getKeyboardLayoutData: (layoutName) => ipcRenderer.invoke('get-keyboard-layout-data', layoutName),
   getSettings: () => ipcRenderer.invoke('get-settings'),
   saveSettings: (settings) => ipcRenderer.send('save-settings', settings),
   closeSettings: () => ipcRenderer.send('close-settings'),

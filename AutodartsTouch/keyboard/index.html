@@ -223,36 +223,42 @@
     let umlautMappings = {};
 
     async function loadLayout(layoutName) {
-      // Sanitize layoutName to prevent directory traversal
+      // Sanitize layoutName
       const safeLayoutName = layoutName.replace(/[^a-zA-Z0-9_-]/g, '');
       if (!safeLayoutName) {
         console.error('Invalid layout name provided.');
         return Promise.reject('Invalid layout name');
       }
 
-      return new Promise((resolve, reject) => {
+      try {
+        // Use the new IPC handler to get the layout data directly from the main process
+        const layoutData = await window.electronAPI.getKeyboardLayoutData(safeLayoutName);
+
+        if (!layoutData) {
+          throw new Error(`No layout data returned for '${safeLayoutName}'`);
+        }
+
+        // Execute the layout script data by creating a script tag
         const script = document.createElement('script');
-        script.src = `./layouts/${safeLayoutName}.js`; // Explicitly relative path
-
-        script.onload = () => {
-          if (window.keyboardLayouts && window.umlautMappings) {
-            layouts = window.keyboardLayouts;
-            umlautMappings = window.umlautMappings;
-            console.log(`Layout '${safeLayoutName}' loaded successfully.`);
-            resolve();
-          } else {
-            console.error(`Layout file ${safeLayoutName}.js did not define required variables.`);
-            reject(`Invalid layout file: ${safeLayoutName}.js`);
-          }
-        };
-
-        script.onerror = () => {
-          console.error(`Failed to load layout script: ${safeLayoutName}.js`);
-          reject(`Failed to load layout: ${safeLayoutName}`);
-        };
-
+        script.textContent = layoutData;
         document.head.appendChild(script);
-      });
+
+        // The script should have defined these global variables.
+        // We check this to ensure the layout script is valid.
+        if (window.keyboardLayouts && window.umlautMappings) {
+          layouts = window.keyboardLayouts;
+          umlautMappings = window.umlautMappings;
+          console.log(`Layout '${safeLayoutName}' loaded and executed successfully.`);
+          // Clean up the script tag after execution
+          script.remove();
+          return Promise.resolve();
+        } else {
+          throw new Error(`Layout data for '${safeLayoutName}' did not define required variables.`);
+        }
+      } catch (error) {
+        console.error(`Failed to load layout '${safeLayoutName}':`, error);
+        return Promise.reject(error);
+      }
     }
 
     function createKeyboard() {
