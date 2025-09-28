@@ -223,7 +223,6 @@
     let umlautMappings = {};
 
     async function loadLayout(layoutName) {
-      // Sanitize layoutName
       const safeLayoutName = layoutName.replace(/[^a-zA-Z0-9_-]/g, '');
       if (!safeLayoutName) {
         console.error('Invalid layout name provided.');
@@ -231,26 +230,19 @@
       }
 
       try {
-        // Use the new IPC handler to get the layout data directly from the main process
         const layoutData = await window.electronAPI.getKeyboardLayoutData(safeLayoutName);
-
         if (!layoutData) {
           throw new Error(`No layout data returned for '${safeLayoutName}'`);
         }
 
-        // Execute the layout script data by creating a script tag
-        const script = document.createElement('script');
-        script.textContent = layoutData;
-        document.head.appendChild(script);
+        // Directly execute the script data using eval. This is more reliable for
+        // defining the global variables `keyboardLayouts` and `umlautMappings`.
+        eval(layoutData);
 
-        // The script should have defined these global variables.
-        // We check this to ensure the layout script is valid.
         if (window.keyboardLayouts && window.umlautMappings) {
           layouts = window.keyboardLayouts;
           umlautMappings = window.umlautMappings;
-          console.log(`Layout '${safeLayoutName}' loaded and executed successfully.`);
-          // Clean up the script tag after execution
-          script.remove();
+          console.log(`Layout '${safeLayoutName}' loaded and executed successfully via eval.`);
           return Promise.resolve();
         } else {
           throw new Error(`Layout data for '${safeLayoutName}' did not define required variables.`);
