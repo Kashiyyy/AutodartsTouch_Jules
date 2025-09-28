@@ -146,10 +146,18 @@ if ! git clone --depth 1 --branch "$BRANCH_NAME" "$GITHUB_REPO_URL" "$CLONE_DIR"
   print_error "Failed to clone the repository. Please check the URL and your connection."
 fi
 
-# Copy all contents from the cloned repository to the application directory
-print_info "Copying all application files to $APP_DIR..."
-# The trailing dot on the source is crucial. It copies the content of the directory.
-if ! cp -a "$CLONE_DIR/." "$APP_DIR/"; then
+# The actual application files are in the 'AutodartsTouch' subdirectory of the cloned repo.
+SOURCE_SUBDIR="$CLONE_DIR/AutodartsTouch"
+
+# Check if the source subdirectory exists
+if [ ! -d "$SOURCE_SUBDIR" ]; then
+    print_error "The 'AutodartsTouch' subdirectory was not found in the repository."
+fi
+
+# Copy all contents from the application's source subdirectory into the final APP_DIR.
+print_info "Copying application files to $APP_DIR..."
+# The trailing '/.' is crucial. It copies the *contents* of the directory, not the directory itself.
+if ! cp -a "$SOURCE_SUBDIR/." "$APP_DIR/"; then
     print_error "Failed to copy application files."
 fi
 
