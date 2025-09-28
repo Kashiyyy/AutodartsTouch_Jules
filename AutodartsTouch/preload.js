@@ -31,5 +31,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.send('input-blurred');
   },
   getSettings: () => ipcRenderer.invoke('get-settings'),
-  saveSettings: (settings) => ipcRenderer.send('save-settings', settings)
+  saveSettings: (settings) => ipcRenderer.send('save-settings', settings),
+  closeSettings: () => ipcRenderer.send('close-settings')
 });

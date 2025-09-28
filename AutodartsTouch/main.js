@@ -155,6 +155,9 @@ function showKeyboardView() {
     mainWindow.addBrowserView(keyboardView);
     keyboardVisible = true;
     
+    // Apply custom styles
+    applyKeyboardStyle();
+
     // Initial layout with default height
     showTab(currentView);
     updateKeyboardBounds();
@@ -250,11 +253,13 @@ function createSettingsWindow() {
     return;
   }
   settingsWindow = new BrowserWindow({
-    width: 500,
-    height: 450,
+    width: 800,
+    height: 600,
     parent: mainWindow,
     modal: true,
     show: false,
+    frame: false,
+    transparent: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -262,7 +267,6 @@ function createSettingsWindow() {
     }
   });
   settingsWindow.loadFile(path.join(__dirname, 'settings.html'));
-  settingsWindow.setMenuBarVisibility(false);
   settingsWindow.once('ready-to-show', () => {
     settingsWindow.show();
   });
@@ -273,8 +277,6 @@ function createSettingsWindow() {
 
 function applySettings() {
   const volume = store.get('volume', 50);
-  const keyboardWidth = store.get('keyboard.width', 100);
-  const keyHeight = store.get('keyboard.keyHeight', 50);
 
   // Set system volume
   exec(`amixer -D pulse sset Master ${volume}%`, (error, stdout, stderr) => {
@@ -285,12 +287,26 @@ function applySettings() {
     console.log(`System volume set to ${volume}%`);
   });
 
-  // Update keyboard style
+  // Also apply keyboard style if visible
+  applyKeyboardStyle();
+}
+
+function applyKeyboardStyle() {
+  const keyboardWidth = store.get('keyboard.width', 100);
+  const keyHeight = store.get('keyboard.keyHeight', 50);
+
   if (keyboardView && keyboardView.webContents) {
-    keyboardView.webContents.send('update-keyboard-style', {
-      width: keyboardWidth,
-      keyHeight: keyHeight
-    });
+    const sendStyle = () => {
+      keyboardView.webContents.send('update-keyboard-style', {
+        width: keyboardWidth,
+        keyHeight: keyHeight
+      });
+    };
+    if (keyboardView.webContents.isLoading()) {
+      keyboardView.webContents.once('dom-ready', sendStyle);
+    } else {
+      sendStyle();
+    }
   }
 }
 
@@ -499,6 +515,12 @@ ipcMain.on('save-settings', (event, settings) => {
   store.set('keyboard.width', settings.keyboardWidth);
   store.set('keyboard.keyHeight', settings.keyHeight);
   applySettings();
+  if (settingsWindow) {
+    settingsWindow.close();
+  }
+});
+
+ipcMain.on('close-settings', () => {
   if (settingsWindow) {
     settingsWindow.close();
   }
