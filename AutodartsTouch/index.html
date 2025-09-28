@@ -35,8 +35,7 @@ button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 a
     </div>
 
     <div id="tabs" role="tablist" aria-label="Seiten">
-      <button onclick="switchTab('tab1')" role="tab" aria-selected="true" id="tab1btn">Seite 1</button>
-      <button onclick="switchTab('tab2')" role="tab" aria-selected="false" id="tab2btn">Seite 2</button>
+      <!-- Tabs will be dynamically inserted here -->
     </div>
 
     <div style="display:flex;align-items:center;justify-content:center;">
@@ -46,13 +45,50 @@ button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 a
   </div>
 
 <script>
-  const tabs = [document.getElementById('tab1btn'), document.getElementById('tab2btn')];
-  function setActive(id){ tabs.forEach(t => t.setAttribute('aria-selected', t.id === id+'btn' ? 'true' : 'false')); }
-  setActive('tab1');
-  function switchTab(id){ setActive(id); if(window.api && window.api.switchTab) window.api.switchTab(id); }
+  let tabButtons = [];
+
+  function setActive(id) {
+    tabButtons.forEach(t => {
+      t.setAttribute('aria-selected', t.id === id ? 'true' : 'false');
+    });
+  }
+
+  function switchTab(tabId) {
+    setActive(tabId);
+    if (window.api && window.api.switchTab) {
+      window.api.switchTab(tabId);
+    }
+  }
+
+  async function generateTabs() {
+    const tabsContainer = document.getElementById('tabs');
+    if (window.api && window.api.getTabs) {
+      const tabs = await window.api.getTabs();
+      tabs.forEach((tab, index) => {
+        if (tab.url) { // Only show tabs that have a URL
+          const button = document.createElement('button');
+          const tabId = `tab${index}`;
+          button.id = tabId;
+          button.textContent = tab.name || `Tab ${index + 1}`;
+          button.setAttribute('role', 'tab');
+          button.setAttribute('aria-selected', 'false');
+          button.onclick = () => switchTab(tabId);
+          tabsContainer.appendChild(button);
+          tabButtons.push(button);
+        }
+      });
+
+      // Set the first tab as active by default
+      if (tabButtons.length > 0) {
+        setActive(tabButtons[0].id);
+      }
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', generateTabs);
 
   const webVKBtn = document.getElementById('webVKBtn');
-  webVKBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); if(window.api && window.api.toggleWebKeyboard) window.api.toggleWebKeyboard(); });
+  webVKBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); if (window.api && window.api.toggleWebKeyboard) window.api.toggleWebKeyboard(); });
   webVKBtn.addEventListener('click', (e) => e.preventDefault());
 
   const settingsBtn = document.getElementById('settingsBtn');

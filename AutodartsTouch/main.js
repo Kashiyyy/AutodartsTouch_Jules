@@ -10,7 +10,7 @@ let views = {};
 let toolbarView;
 let keyboardView;
 let settingsView;
-let currentView = 'tab1';
+let currentView = 'tab0'; // Default to the first tab
 let previousView = null;
 
 const TOOLBAR_HEIGHT = 72;
@@ -35,35 +35,45 @@ function createWindow() {
     }
   });
 
-  // Content BrowserViews
-  views.tab1 = new BrowserView({ webPreferences: { sandbox: false, preload: path.join(__dirname, 'preload.js') } });
-  views.tab2 = new BrowserView({ webPreferences: { sandbox: false, preload: path.join(__dirname, 'preload.js') } });
-  settingsView = new BrowserView({ webPreferences: { sandbox: false, preload: path.join(__dirname, 'preload.js') } });
+  // Load tab settings from store
+  const tabs = store.get('tabs', [
+    { name: 'Autodarts', url: 'https://play.autodarts.io/' },
+    { name: 'Service', url: 'http://localhost:3180/' }
+  ]);
 
-  // primary content (tab1) and your original service (tab2)
-  views.tab1.webContents.loadURL('https://play.autodarts.io/').catch(e => console.error('tab1 load', e));
-  views.tab2.webContents.loadURL('http://localhost:3180/').catch(e => console.error('tab2 load', e));
+  // Create BrowserViews for each configured tab
+  tabs.forEach((tab, index) => {
+    if (tab.url) {
+      const view = new BrowserView({ webPreferences: { sandbox: false, preload: path.join(__dirname, 'preload.js') } });
+      view.webContents.loadURL(tab.url).catch(e => console.error(`tab${index} load error:`, e));
+      mainWindow.addBrowserView(view);
+      views[`tab${index}`] = view;
+    }
+  });
+
+  // Settings view
+  settingsView = new BrowserView({ webPreferences: { sandbox: false, preload: path.join(__dirname, 'preload.js') } });
   settingsView.webContents.loadFile(path.join(__dirname, 'settings.html')).catch(e => console.error('settings load', e));
+  mainWindow.addBrowserView(settingsView);
 
   // Toolbar view
   toolbarView = new BrowserView({
     webPreferences: { contextIsolation: true, sandbox: false, preload: path.join(__dirname, 'preload.js') }
   });
   toolbarView.webContents.loadFile(path.join(__dirname, 'index.html')).catch(e => console.error('toolbar load', e));
+  mainWindow.addBrowserView(toolbarView);
 
-  // Keyboard view - load the local keyboard page (file://)
+  // Keyboard view
   keyboardView = new BrowserView({
     webPreferences: { contextIsolation: true, sandbox: false, preload: path.join(__dirname, 'preload.js') }
   });
   keyboardView.webContents.loadFile(path.join(__dirname, 'keyboard', 'index.html')).catch(e => console.error('keyboard load', e));
 
-  // Add main content and toolbar (keyboard not added yet)
-  mainWindow.addBrowserView(views.tab1);
-  mainWindow.addBrowserView(views.tab2);
-  mainWindow.addBrowserView(settingsView);
-  mainWindow.addBrowserView(toolbarView);
-
-  showTab(currentView);
+  // Determine the initial tab to show
+  const initialTab = Object.keys(views).length > 0 ? 'tab0' : null;
+  if (initialTab) {
+    showTab(initialTab);
+  }
 
   applySettings();
 
@@ -516,7 +526,11 @@ ipcMain.handle('get-settings', async () => {
   return {
     volume: store.get('volume', 50),
     keyboardWidth: store.get('keyboard.width', 100),
-    keyHeight: store.get('keyboard.keyHeight', 50)
+    keyHeight: store.get('keyboard.keyHeight', 50),
+    tabs: store.get('tabs', [
+      { name: 'Autodarts', url: 'https://play.autodarts.io/' },
+      { name: 'Service', url: 'http://localhost:3180/' }
+    ])
   };
 });
 
@@ -524,14 +538,33 @@ ipcMain.on('save-settings', (event, settings) => {
   store.set('volume', settings.volume);
   store.set('keyboard.width', settings.keyboardWidth);
   store.set('keyboard.keyHeight', settings.keyHeight);
+  store.set('tabs', settings.tabs);
 
   applySettings(); // Apply and save the settings
 
+  // Inform the user that a restart is required for tab changes to take effect
+  // This is a simple way to handle dynamic view recreation
   if (previousView) {
     showTab(previousView);
   }
   hideKeyboardView();
   autoCloseEnabled = true;
+
+  // Optional: Add a dialog to inform the user about the restart.
+  const { dialog } = require('electron');
+  dialog.showMessageBox(mainWindow, {
+    type: 'info',
+    title: 'Einstellungen gespeichert',
+    message: 'Die Tab-Einstellungen wurden gespeichert. Bitte starten Sie die Anwendung neu, damit die Änderungen wirksam werden.',
+    buttons: ['OK']
+  });
+});
+
+ipcMain.handle('get-tabs', async () => {
+  return store.get('tabs', [
+    { name: 'Autodarts', url: 'https://play.autodarts.io/' },
+    { name: 'Service', url: 'http://localhost:3180/' }
+  ]);
 });
 
 ipcMain.on('close-settings', () => {

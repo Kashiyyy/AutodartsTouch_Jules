@@ -63,6 +63,70 @@
     <input type="range" id="keyHeight" min="30" max="80" value="50">
   </div>
 
+  <div class="tabs-settings">
+    <h2>Tab-Einstellungen</h2>
+    <!-- Tab 1 -->
+    <div class="tab-setting">
+      <h3 style="color: #fff; text-align: center;">Tab 1</h3>
+      <div class="setting">
+        <label for="tabName1">Tab-Name</label>
+        <input type="text" id="tabName1" placeholder="z.B. Autodarts">
+      </div>
+      <div class="setting">
+        <label for="tabUrl1">URL</label>
+        <input type="text" id="tabUrl1" placeholder="https://autodarts.io">
+      </div>
+    </div>
+    <!-- Tab 2 -->
+    <div class="tab-setting">
+      <h3 style="color: #fff; text-align: center;">Tab 2</h3>
+      <div class="setting">
+        <label for="tabName2">Tab-Name</label>
+        <input type="text" id="tabName2" placeholder="z.B. Google">
+      </div>
+      <div class="setting">
+        <label for="tabUrl2">URL</label>
+        <input type="text" id="tabUrl2" placeholder="https://google.com">
+      </div>
+    </div>
+    <!-- Tab 3 -->
+    <div class="tab-setting">
+      <h3 style="color: #fff; text-align: center;">Tab 3</h3>
+      <div class="setting">
+        <label for="tabName3">Tab-Name</label>
+        <input type="text" id="tabName3" placeholder="Name für Tab 3">
+      </div>
+      <div class="setting">
+        <label for="tabUrl3">URL</label>
+        <input type="text" id="tabUrl3" placeholder="URL für Tab 3">
+      </div>
+    </div>
+    <!-- Tab 4 -->
+    <div class="tab-setting">
+      <h3 style="color: #fff; text-align: center;">Tab 4</h3>
+      <div class="setting">
+        <label for="tabName4">Tab-Name</label>
+        <input type="text" id="tabName4" placeholder="Name für Tab 4">
+      </div>
+      <div class="setting">
+        <label for="tabUrl4">URL</label>
+        <input type="text" id="tabUrl4" placeholder="URL für Tab 4">
+      </div>
+    </div>
+    <!-- Tab 5 -->
+    <div class="tab-setting">
+      <h3 style="color: #fff; text-align: center;">Tab 5</h3>
+      <div class="setting">
+        <label for="tabName5">Tab-Name</label>
+        <input type="text" id="tabName5" placeholder="Name für Tab 5">
+      </div>
+      <div class="setting">
+        <label for="tabUrl5">URL</label>
+        <input type="text" id="tabUrl5" placeholder="URL für Tab 5">
+      </div>
+    </div>
+  </div>
+
   <div class="buttons">
     <button id="saveBtn">Speichern & Schließen</button>
     <button id="closeBtn">Schließen</button>
@@ -74,6 +138,22 @@
     const keyHeightSlider = document.getElementById('keyHeight');
     const saveBtn = document.getElementById('saveBtn');
     const closeBtn = document.getElementById('closeBtn');
+
+    const tabNameInputs = [
+      document.getElementById('tabName1'),
+      document.getElementById('tabName2'),
+      document.getElementById('tabName3'),
+      document.getElementById('tabName4'),
+      document.getElementById('tabName5'),
+    ];
+
+    const tabUrlInputs = [
+      document.getElementById('tabUrl1'),
+      document.getElementById('tabUrl2'),
+      document.getElementById('tabUrl3'),
+      document.getElementById('tabUrl4'),
+      document.getElementById('tabUrl5'),
+    ];
 
     function sendLiveUpdate() {
       if (window.electronAPI && window.electronAPI.updateKeyboardStyleLive) {
@@ -92,6 +172,12 @@
           if (settings.volume) volumeSlider.value = settings.volume;
           if (settings.keyboardWidth) keyboardWidthSlider.value = settings.keyboardWidth;
           if (settings.keyHeight) keyHeightSlider.value = settings.keyHeight;
+          if (settings.tabs) {
+            settings.tabs.forEach((tab, index) => {
+              if (tabNameInputs[index]) tabNameInputs[index].value = tab.name;
+              if (tabUrlInputs[index]) tabUrlInputs[index].value = tab.url;
+            });
+          }
         }
       });
     }
@@ -101,11 +187,24 @@
     keyHeightSlider.addEventListener('input', sendLiveUpdate);
 
     saveBtn.addEventListener('click', () => {
+      const tabs = [];
+      for (let i = 0; i < 5; i++) {
+        const name = tabNameInputs[i].value.trim();
+        const url = tabUrlInputs[i].value.trim();
+        if (name && url) {
+          tabs.push({ name, url });
+        } else {
+          tabs.push({ name: '', url: '' });
+        }
+      }
+
       const settings = {
         volume: volumeSlider.value,
         keyboardWidth: keyboardWidthSlider.value,
-        keyHeight: keyHeightSlider.value
+        keyHeight: keyHeightSlider.value,
+        tabs: tabs,
       };
+
       if (window.electronAPI && window.electronAPI.saveSettings) {
         window.electronAPI.saveSettings(settings);
       }
