@@ -597,6 +597,25 @@ ipcMain.on('save-settings', (event, settings) => {
   autoCloseEnabled = true;
 });
 
+ipcMain.on('notify-touch-used', () => {
+  const css = '* { cursor: none !important; }';
+  // Apply to all views
+  Object.values(views).forEach(view => {
+    if (view && view.webContents) {
+      view.webContents.insertCSS(css);
+    }
+  });
+  if (toolbarView && toolbarView.webContents) {
+    toolbarView.webContents.insertCSS(css);
+  }
+  if (settingsView && settingsView.webContents) {
+    settingsView.webContents.insertCSS(css);
+  }
+  if (keyboardView && keyboardView.webContents) {
+    keyboardView.webContents.insertCSS(css);
+  }
+});
+
 ipcMain.handle('get-tabs', async () => {
   return store.get('tabs', [
     { name: 'Autodarts', url: 'https://play.autodarts.io/' },

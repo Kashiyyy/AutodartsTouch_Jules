@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('api', {
   refresh: () => ipcRenderer.send('refresh'),
   forceReload: () => ipcRenderer.send('force-reload'),
   toggleWebKeyboard: () => ipcRenderer.send('toggle-webkeyboard'),
+  notifyTouchUsed: () => ipcRenderer.send('notify-touch-used'),
   getTabs: () => ipcRenderer.invoke('get-tabs'),
   sendKey: (key) => ipcRenderer.send('webkeyboard-key', key),
   setShiftStatus: (isActive) => ipcRenderer.send('keyboard-shift-status', isActive),
