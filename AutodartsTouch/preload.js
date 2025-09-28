@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('api', {
   switchTab: (t) => ipcRenderer.send('switch-tab', t),
   refresh: () => ipcRenderer.send('refresh'),
   toggleWebKeyboard: () => ipcRenderer.send('toggle-webkeyboard'),
+  getTabs: () => ipcRenderer.invoke('get-tabs'),
   sendKey: (key) => ipcRenderer.send('webkeyboard-key', key),
   setShiftStatus: (isActive) => ipcRenderer.send('keyboard-shift-status', isActive),
   reportKeyboardHeight: (height) => ipcRenderer.send('keyboard-height-changed', height),
