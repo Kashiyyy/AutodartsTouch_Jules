@@ -268,8 +268,35 @@
     function createKeyboard() {
       function renderKeyboard() {
         keyboardElement.innerHTML = '';
-        
-        const layout = layouts[currentLayout] || layouts.default;
+
+        let layout = layouts[currentLayout];
+
+        // If the desired layout (e.g., 'default' or 'shift') isn't found, fall back gracefully.
+        if (!layout) {
+          console.warn(`Layout '${currentLayout}' not found. Attempting to find a fallback.`);
+          // Common layout names to try, in order of preference.
+          const fallbackKeys = ['default', 'normal'];
+          for (const key of fallbackKeys) {
+            if (layouts[key]) {
+              layout = layouts[key];
+              console.log(`Using fallback layout: '${key}'`);
+              break;
+            }
+          }
+          // If no common fallback is found, use the first layout defined in the file.
+          if (!layout) {
+            const firstKey = Object.keys(layouts)[0];
+            if (firstKey) {
+              layout = layouts[firstKey];
+              console.log(`Using first available layout as fallback: '${firstKey}'`);
+            }
+          }
+        }
+
+        // If, after all fallbacks, no layout is available, we cannot render the keyboard.
+        if (!layout) {
+          throw new Error("No valid keyboard layout found in the loaded data.");
+        }
         
         layout.forEach((row) => {
           const rowDiv = document.createElement('div');
@@ -678,25 +705,30 @@
       }
 
       // This code now only runs AFTER a layout has been successfully loaded.
-      const keyboardInstance = createKeyboard();
+      try {
+        const keyboardInstance = createKeyboard();
 
-      // Global functions for main process to call
-      window.updateKeyboardLayout = () => {
-        if (keyboardInstance) keyboardInstance.renderKeyboard();
-      };
-      window.resetKeyboard = () => {
-        resetKeyboardToDefault();
-        if (keyboardInstance) keyboardInstance.renderKeyboard();
-      };
-      window.showKeyboard = () => {
-        resetKeyboardToDefault();
-        if (keyboardInstance) keyboardInstance.renderKeyboard();
-        setTimeout(reportKeyboardHeight, 50);
-      };
+        // Global functions for main process to call
+        window.updateKeyboardLayout = () => {
+          if (keyboardInstance) keyboardInstance.renderKeyboard();
+        };
+        window.resetKeyboard = () => {
+          resetKeyboardToDefault();
+          if (keyboardInstance) keyboardInstance.renderKeyboard();
+        };
+        window.showKeyboard = () => {
+          resetKeyboardToDefault();
+          if (keyboardInstance) keyboardInstance.renderKeyboard();
+          setTimeout(reportKeyboardHeight, 50);
+        };
 
-      // Report initial height and on resize
-      setTimeout(() => reportKeyboardHeight(), 100);
-      window.addEventListener('resize', () => setTimeout(reportKeyboardHeight, 100));
+        // Report initial height and on resize
+        setTimeout(() => reportKeyboardHeight(), 100);
+        window.addEventListener('resize', () => setTimeout(reportKeyboardHeight, 100));
+      } catch (renderError) {
+        console.error("FATAL: Error rendering keyboard.", renderError);
+        showNotification(`FATAL: Error rendering keyboard: ${renderError.message}`, true);
+      }
     }
 
     // Start the keyboard initialization
