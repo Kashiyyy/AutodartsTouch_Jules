@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('api', {
   openPowerMenu: () => ipcRenderer.send('open-power-menu'),
   closePowerMenu: () => ipcRenderer.send('close-power-menu'),
   powerControl: (action) => ipcRenderer.send('power-control', action),
+  getKeyboardLayouts: () => ipcRenderer.invoke('get-keyboard-layouts'),
   getTabs: () => ipcRenderer.invoke('get-tabs'),
   sendKey: (key) => ipcRenderer.send('webkeyboard-key', key),
   setShiftStatus: (isActive) => ipcRenderer.send('keyboard-shift-status', isActive),

@@ -1,5 +1,6 @@
 const { app, BrowserWindow, BrowserView, ipcMain, screen } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const Store = require('electron-store');
 const { exec } = require('child_process');
 
@@ -58,10 +59,14 @@ function createWindow() {
   mainWindow.addBrowserView(toolbarView);
 
   // Keyboard view
+  const keyboardLayout = store.get('keyboard.layout', 'de');
   keyboardView = new BrowserView({
-    webPreferences: { contextIsolation: true, sandbox: false, preload: path.join(__dirname, 'preload.js') }
+    webPreferences: { contextIsolation: true, sandbox: false, preload: path.join(__dirname, 'preload.js') },
+    transparent: true
   });
-  keyboardView.webContents.loadFile(path.join(__dirname, 'keyboard', 'index.html')).catch(e => console.error('keyboard load', e));
+  keyboardView.webContents.loadFile(path.join(__dirname, 'keyboard', 'index.html'), {
+    query: { layout: keyboardLayout }
+  }).catch(e => console.error('keyboard load', e));
 
   // Power Menu view
   powerMenuView = new BrowserView({
@@ -635,11 +640,25 @@ ipcMain.on('power-control', (event, action) => {
   }
 });
 
+ipcMain.handle('get-keyboard-layouts', async () => {
+    const layoutDir = path.join(__dirname, 'keyboard', 'layouts');
+    try {
+        const files = await fs.promises.readdir(layoutDir);
+        return files
+            .filter(file => file.endsWith('.js'))
+            .map(file => file.replace('.js', ''));
+    } catch (error) {
+        console.error('Failed to read keyboard layouts:', error);
+        return []; // Return empty array on error
+    }
+});
+
 ipcMain.handle('get-settings', async () => {
   return {
     volume: store.get('volume', 50),
     keyboardWidth: store.get('keyboard.width', 100),
     keyHeight: store.get('keyboard.keyHeight', 50),
+    keyboardLayout: store.get('keyboard.layout', 'de'),
     tabs: store.get('tabs', [
       { name: 'Autodarts', url: 'https://play.autodarts.io/' },
       { name: 'Service', url: 'http://localhost:3180/' }
@@ -651,9 +670,18 @@ ipcMain.on('save-settings', (event, settings) => {
   store.set('volume', settings.volume);
   store.set('keyboard.width', settings.keyboardWidth);
   store.set('keyboard.keyHeight', settings.keyHeight);
+  store.set('keyboard.layout', settings.keyboardLayout);
   store.set('tabs', settings.tabs);
 
-  applySettings(); // Apply volume and keyboard settings
+  applySettings(); // Apply volume and some keyboard settings
+
+  // Reload keyboard view with new layout
+  if (keyboardView && keyboardView.webContents) {
+      const newLayout = store.get('keyboard.layout', 'de');
+      keyboardView.webContents.loadFile(path.join(__dirname, 'keyboard', 'index.html'), {
+          query: { layout: newLayout }
+      }).catch(e => console.error('keyboard reload failed', e));
+  }
 
   // Reload tabs dynamically to apply changes
   reloadTabs();

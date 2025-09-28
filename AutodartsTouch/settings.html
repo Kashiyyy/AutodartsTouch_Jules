@@ -26,7 +26,7 @@
       background-attachment: fixed;
     }
     .container {
-      max-width: 800px; /* Increased width for two-column layout */
+      max-width: 800px;
       margin: 0 auto;
       background-color: rgba(0, 0, 0, 0.2);
       padding: 20px;
@@ -35,7 +35,7 @@
     h1, h2 { text-align: center; }
     .setting { margin-bottom: 20px; }
     label { display: block; margin-bottom: 5px; }
-    input[type="range"], input[type="text"] {
+    input[type="range"], input[type="text"], select {
       width: 100%;
       box-sizing: border-box;
       padding: 8px;
@@ -83,6 +83,11 @@
     <div class="setting">
       <label for="keyHeight">Key Height (px)</label>
       <input type="range" id="keyHeight" min="30" max="80" value="50">
+    </div>
+
+    <div class="setting">
+      <label for="keyboardLayout">Keyboard Layout</label>
+      <select id="keyboardLayout"></select>
     </div>
 
     <div class="tabs-settings">
@@ -169,6 +174,7 @@
     const volumeSlider = document.getElementById('volume');
     const keyboardWidthSlider = document.getElementById('keyboardWidth');
     const keyHeightSlider = document.getElementById('keyHeight');
+    const keyboardLayoutSelect = document.getElementById('keyboardLayout');
     const saveBtn = document.getElementById('saveBtn');
     const closeBtn = document.getElementById('closeBtn');
 
@@ -198,13 +204,28 @@
       }
     }
 
-    // Load saved settings
-    if (window.electronAPI && window.electronAPI.getSettings) {
-      window.electronAPI.getSettings().then(settings => {
+    async function loadInitialData() {
+      if (!window.electronAPI) return;
+
+      // First, populate the layout dropdown
+      if (window.electronAPI.getKeyboardLayouts) {
+        const layouts = await window.electronAPI.getKeyboardLayouts();
+        layouts.forEach(layout => {
+            const option = document.createElement('option');
+            option.value = layout;
+            option.textContent = layout.toUpperCase();
+            keyboardLayoutSelect.appendChild(option);
+        });
+      }
+
+      // Then, load all saved settings
+      if (window.electronAPI.getSettings) {
+        const settings = await window.electronAPI.getSettings();
         if (settings) {
           if (settings.volume) volumeSlider.value = settings.volume;
           if (settings.keyboardWidth) keyboardWidthSlider.value = settings.keyboardWidth;
           if (settings.keyHeight) keyHeightSlider.value = settings.keyHeight;
+          if (settings.keyboardLayout) keyboardLayoutSelect.value = settings.keyboardLayout;
           if (settings.tabs) {
             settings.tabs.forEach((tab, index) => {
               if (tabNameInputs[index]) tabNameInputs[index].value = tab.name;
@@ -212,8 +233,10 @@
             });
           }
         }
-      });
+      }
     }
+
+    loadInitialData();
 
     // Add listeners for live-updates
     keyboardWidthSlider.addEventListener('input', sendLiveUpdate);
@@ -235,6 +258,7 @@
         volume: volumeSlider.value,
         keyboardWidth: keyboardWidthSlider.value,
         keyHeight: keyHeightSlider.value,
+        keyboardLayout: keyboardLayoutSelect.value,
         tabs: tabs,
       };
 
