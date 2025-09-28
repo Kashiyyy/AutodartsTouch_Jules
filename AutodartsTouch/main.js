@@ -548,10 +548,6 @@ ipcMain.on('close-settings', () => {
 // For live preview of keyboard settings
 ipcMain.on('update-keyboard-style-live', (event, style) => {
   applyKeyboardStyle(style);
-  // Add a small delay to allow the DOM to update before measuring
-  setTimeout(() => {
-    measureKeyboardHeight();
-  }, 100);
 });
 
 // Keyboard height update from keyboard view
