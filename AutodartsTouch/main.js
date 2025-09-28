@@ -247,51 +247,32 @@ function hideKeyboardView() {
 }
 
 function measureKeyboardHeight() {
-  // Try to get the actual keyboard height from the DOM
+  // This function is now a fallback. The primary method is the IPC listener below.
   if (keyboardView && keyboardView.webContents) {
-    keyboardView.webContents.executeJavaScript(`
-      (function() {
-        const keyboardElement = document.getElementById('keyboard');
-        if (keyboardElement) {
-          // Force a layout reflow
-          keyboardElement.offsetHeight;
-          
-          // Get the pure element height - this is what we actually need
-          const elementHeight = keyboardElement.offsetHeight;
-          
-          console.log('Keyboard measurements:');
-          console.log('- Pure element height:', elementHeight, '<-- This is what we need');
-          console.log('- Window height:', window.innerHeight);
-          console.log('- Body height:', document.body.offsetHeight);
-          
-          return {
-            height: elementHeight, // Use pure element height
-            elementHeight: elementHeight,
-            windowHeight: window.innerHeight,
-            bodyHeight: document.body.offsetHeight
-          };
+    keyboardView.webContents.executeJavaScript('document.getElementById("keyboard")?.offsetHeight || 0')
+    .then(height => {
+      console.log(`Measured keyboard height via JS execution: ${height}px`);
+      if (height > 100) { // Only accept reasonable heights
+        if (keyboardActualHeight !== height) {
+          console.log(`Updating keyboard height to ${height}px`);
+          keyboardActualHeight = height;
+          if (keyboardVisible) {
+            updateKeyboardBounds();
+            showTab(currentView);
+          }
         }
-        return { height: 300, elementHeight: 0, windowHeight: 0, bodyHeight: 0 };
-      })();
-    `).then(result => {
-      console.log('Keyboard measurement result:', result);
-      
-      if (result && result.elementHeight > 0) {
-        // Use the pure element height directly
-        const newHeight = result.elementHeight;
-        console.log(`Setting keyboard height to pure element height: ${newHeight}px (was ${keyboardActualHeight}px)`);
-        keyboardActualHeight = newHeight;
-        
-        // Immediately update layout
-        if (keyboardVisible) {
-          updateKeyboardBounds();
-          showTab(currentView);
+      } else {
+        console.warn(`Measured height (${height}px) is too small. Using fallback height.`);
+        // If measurement is invalid, use a safe fallback but still update layout
+        keyboardActualHeight = 250;
+        if(keyboardVisible) {
+            updateKeyboardBounds();
+            showTab(currentView);
         }
       }
     }).catch(e => {
-      console.error('Failed to measure keyboard height:', e);
-      // Fallback to a reasonable default
-      keyboardActualHeight = 220;
+      console.error('Failed to measure keyboard height via JS, using fallback.', e);
+      keyboardActualHeight = 250;
       if (keyboardVisible) {
         updateKeyboardBounds();
         showTab(currentView);
@@ -576,34 +557,18 @@ ipcMain.on('toggle-webkeyboard', () => {
 });
 
 ipcMain.on('open-power-menu', () => {
-    if (mainWindow && powerMenuView) {
-        // Apply blur to all other views
-        const allViews = [...Object.values(views), toolbarView, settingsView, keyboardView];
-        allViews.forEach(view => {
-            if (view && view.webContents && !view.webContents.isDestroyed()) {
-                view.webContents.insertCSS('html { filter: blur(5px) !important; }').catch(e => console.error(`Failed to apply blur: ${e}`));
-            }
-        });
-
-        // Ensure power menu is on top
-        mainWindow.setTopBrowserView(powerMenuView);
+    if (mainWindow && powerMenuView && !powerMenuView.webContents.isDestroyed()) {
         const [w, h] = mainWindow.getSize();
+        // Set the bounds to cover the screen and bring it to the top.
         powerMenuView.setBounds({ x: 0, y: 0, width: w, height: h });
+        mainWindow.setTopBrowserView(powerMenuView);
     }
 });
 
 ipcMain.on('close-power-menu', () => {
-    if (mainWindow && powerMenuView) {
-        // Remove blur from all other views
-        const allViews = [...Object.values(views), toolbarView, settingsView, keyboardView];
-        allViews.forEach(view => {
-            if (view && view.webContents && !view.webContents.isDestroyed()) {
-                view.webContents.insertCSS('html { filter: none !important; }').catch(e => console.error(`Failed to remove blur: ${e}`));
-            }
-        });
-
-        // Hide the power menu by moving it off-screen
+    if (mainWindow && powerMenuView && !powerMenuView.webContents.isDestroyed()) {
         const [w, h] = mainWindow.getSize();
+        // Hide the power menu by moving it off-screen.
         powerMenuView.setBounds({ x: 0, y: h, width: w, height: h });
     }
 });
@@ -628,15 +593,18 @@ ipcMain.on('power-control', (event, action) => {
 });
 
 ipcMain.handle('get-keyboard-layouts', async () => {
+    // This is the correct path, relative to the main.js file.
     const layoutDir = path.join(__dirname, 'keyboard', 'layouts');
+    console.log(`Attempting to read keyboard layouts from: ${layoutDir}`);
     try {
         const files = await fs.promises.readdir(layoutDir);
+        console.log(`Found layout files: ${files}`);
         return files
             .filter(file => file.endsWith('.js'))
             .map(file => file.replace('.js', ''));
     } catch (error) {
-        console.error('Failed to read keyboard layouts:', error);
-        return []; // Return empty array on error
+        console.error(`FATAL: Failed to read keyboard layouts from ${layoutDir}. This is a critical error.`, error);
+        return []; // Return empty array on error to prevent crashing the settings page.
     }
 });
 
@@ -715,12 +683,22 @@ ipcMain.on('update-keyboard-style-live', (event, style) => {
   applyKeyboardStyle(style);
 });
 
-// Keyboard height update from keyboard view
-ipcMain.on('keyboard-height-changed', (ev, height) => {
-  if (height && height > 0) {
-    console.log(`Keyboard height update via IPC: ${height}px (was ${keyboardActualHeight}px)`);
-    keyboardActualHeight = height;
-    
+ipcMain.on('keyboard-height-changed', (event, height) => {
+  // This is the primary method for updating keyboard height.
+  // It's triggered by the renderer process once the keyboard is fully rendered.
+  if (height && height > 100) { // Only accept reasonable heights
+    if (keyboardActualHeight !== height) {
+      console.log(`IPC: Keyboard height updated to ${height}px`);
+      keyboardActualHeight = height;
+      if (keyboardVisible) {
+        updateKeyboardBounds();
+        showTab(currentView);
+      }
+    }
+  } else {
+    console.warn(`IPC: Received invalid keyboard height: ${height}px. Using fallback.`);
+    // If the received height is invalid, use a safe fallback.
+    keyboardActualHeight = 250;
     if (keyboardVisible) {
       updateKeyboardBounds();
       showTab(currentView);

@@ -639,10 +639,11 @@
           await loadLayout('de');
         } catch (fallbackError) {
           console.error("Fatal: Could not load the default 'de' layout. Keyboard will not function.");
-          return;
+          return; // Stop execution if default layout fails
         }
       }
 
+      // This code now only runs AFTER the layout has been successfully loaded.
       const keyboardInstance = createKeyboard();
 
       // Global functions for main process to call
