@@ -696,43 +696,64 @@ ipcMain.on('save-settings', (event, settings) => {
 });
 
 ipcMain.on('notify-touch-used', () => {
-  if (isCursorHidden) return;
-  isCursorHidden = true;
+    if (isCursorHidden) return;
+    isCursorHidden = true;
 
-  console.log('Hiding cursor in all views and frames.');
+    console.log('Hiding cursor in all views and frames with MutationObserver.');
 
-  const script = `
-    (function() {
-      function hideCursorInDocument(doc) {
-        if (!doc || !doc.head) return;
-        if (doc.getElementById('hide-cursor-style')) return;
-        const style = doc.createElement('style');
-        style.id = 'hide-cursor-style';
-        style.innerHTML = '* { cursor: none !important; }';
-        doc.head.appendChild(style);
-      }
+    const script = `
+        (function() {
+            function hideCursorInDocument(doc) {
+                if (!doc || !doc.head) return;
+                if (doc.getElementById('hide-cursor-style')) return;
+                const style = doc.createElement('style');
+                style.id = 'hide-cursor-style';
+                style.innerHTML = '* { cursor: none !important; }';
+                doc.head.appendChild(style);
+            }
 
-      function traverseFrames(win) {
-        try {
-          hideCursorInDocument(win.document);
-          for (let i = 0; i < win.frames.length; i++) {
-            try {
-              traverseFrames(win.frames[i]);
-            } catch(e) { /* ignore cross-origin */ }
-          }
-        } catch (e) { /* ignore cross-origin */ }
-      }
+            function observeDocument(doc) {
+                if (!doc || !doc.body) return;
+                const observer = new MutationObserver((mutations) => {
+                    mutations.forEach((mutation) => {
+                        mutation.addedNodes.forEach((node) => {
+                            if (node.tagName === 'IFRAME') {
+                                try {
+                                    node.addEventListener('load', () => {
+                                        traverseFrames(node.contentWindow);
+                                    }, { once: true });
+                                } catch (e) {
+                                    console.error('Could not add load listener to new iframe:', e);
+                                }
+                            }
+                        });
+                    });
+                });
+                observer.observe(doc.body, { childList: true, subtree: true });
+            }
 
-      traverseFrames(window);
-    })();
-  `;
+            function traverseFrames(win) {
+                try {
+                    hideCursorInDocument(win.document);
+                    observeDocument(win.document);
+                    for (let i = 0; i < win.frames.length; i++) {
+                        try {
+                            traverseFrames(win.frames[i]);
+                        } catch (e) { /* Cross-origin */ }
+                    }
+                } catch (e) { /* Cross-origin */ }
+            }
 
-  const allViews = [...Object.values(views), toolbarView, settingsView, keyboardView, powerMenuView];
-  allViews.forEach(view => {
-    if (view && view.webContents && !view.webContents.isDestroyed()) {
-      view.webContents.executeJavaScript(script).catch(e => console.error('Failed to execute cursor hiding script for a view:', e));
-    }
-  });
+            traverseFrames(window);
+        })();
+    `;
+
+    const allViews = [...Object.values(views), toolbarView, settingsView, keyboardView, powerMenuView];
+    allViews.forEach(view => {
+        if (view && view.webContents && !view.webContents.isDestroyed()) {
+            view.webContents.executeJavaScript(script).catch(e => console.error('Failed to execute cursor hiding script for a view:', e));
+        }
+    });
 });
 
 ipcMain.handle('get-tabs', async () => {
