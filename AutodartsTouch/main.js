@@ -616,21 +616,36 @@ ipcMain.on('toggle-webkeyboard', () => {
 });
 
 ipcMain.on('open-power-menu', () => {
-  if (mainWindow && powerMenuView) {
-    mainWindow.addBrowserView(powerMenuView);
-    const [w, h] = mainWindow.getSize();
-    powerMenuView.setBounds({ x: 0, y: 0, width: w, height: h });
-  }
+    if (mainWindow && powerMenuView) {
+        const allViews = [...Object.values(views), toolbarView, settingsView, keyboardView];
+        allViews.forEach(view => {
+            if (view && view.webContents && !view.webContents.isDestroyed()) {
+                view.webContents.insertCSS('html { filter: blur(5px); }').catch(e => console.error(`Failed to apply blur: ${e}`));
+            }
+        });
+
+        mainWindow.addBrowserView(powerMenuView);
+        const [w, h] = mainWindow.getSize();
+        powerMenuView.setBounds({ x: 0, y: 0, width: w, height: h });
+        mainWindow.setTopBrowserView(powerMenuView);
+    }
 });
 
 ipcMain.on('close-power-menu', () => {
-  if (mainWindow && powerMenuView) {
-    try {
-      mainWindow.removeBrowserView(powerMenuView);
-    } catch (e) {
-      console.error('Failed to remove power menu view:', e);
+    if (mainWindow && powerMenuView) {
+        const allViews = [...Object.values(views), toolbarView, settingsView, keyboardView];
+        allViews.forEach(view => {
+            if (view && view.webContents && !view.webContents.isDestroyed()) {
+                view.webContents.insertCSS('html { filter: initial; }').catch(e => console.error(`Failed to remove blur: ${e}`));
+            }
+        });
+
+        try {
+            mainWindow.removeBrowserView(powerMenuView);
+        } catch (e) {
+            console.error('Failed to remove power menu view:', e);
+        }
     }
-  }
 });
 
 ipcMain.on('power-control', (event, action) => {
