@@ -609,7 +609,8 @@ ipcMain.handle('get-keyboard-layouts', async () => {
 });
 
 ipcMain.handle('get-keyboard-layout-data', async (event, layoutName) => {
-  const safeLayoutName = (layoutName || '').replace(/[^a-zA-Z0-9_-]/g, '');
+  // Convert to lowercase for case-insensitive file systems and consistency.
+  const safeLayoutName = (layoutName || '').toLowerCase().replace(/[^a-z0-9_-]/g, '');
   if (!safeLayoutName) {
     console.error('Request for invalid or empty layout name rejected.');
     return null;

@@ -695,7 +695,8 @@
 
       try {
         console.log(`[KB_DEBUG] 5. Attempting to load layout: '${layoutName}'`);
-        await loadLayout(layoutName);
+        // Convert to lowercase to ensure case-insensitive matching
+        await loadLayout(layoutName.toLowerCase());
         console.log(`[KB_DEBUG] 8. Successfully loaded layout: '${layoutName}'`);
       } catch (error) {
         // If it fails, show a notification and try to load the default 'de' layout.
