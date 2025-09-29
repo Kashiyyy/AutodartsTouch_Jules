@@ -38,7 +38,7 @@ async function createWindow() {
   });
 
   // Create static views that are never reloaded
-  settingsView = new BrowserView({ webPreferences: { sandbox: false, preload: path.join(__dirname, 'preload.js') } });
+  settingsView = new BrowserView({ webPreferences: { contextIsolation: true, sandbox: false, preload: path.join(__dirname, 'preload.js') } });
   mainWindow.addBrowserView(settingsView);
   settingsView.webContents.loadFile(path.join(__dirname, 'settings.html'));
 
@@ -70,7 +70,7 @@ function createDynamicViews() {
   ]);
   tabs.forEach((tab, index) => {
     if (tab && tab.url && tab.url.trim() !== '') {
-      const view = new BrowserView({ webPreferences: { sandbox: false, preload: path.join(__dirname, 'preload.js') } });
+      const view = new BrowserView({ webPreferences: { contextIsolation: true, sandbox: false, preload: path.join(__dirname, 'preload.js') } });
       mainWindow.addBrowserView(view);
       views[`tab${index}`] = view;
       loadingPromises.push(view.webContents.loadURL(tab.url).catch(e => console.error(`tab${index} load error:`, e)));
@@ -324,189 +324,111 @@ function applyKeyboardStyle(style) {
   }
 }
 
-function setupAutoKeyboard() {
-  console.log('Setting up auto-keyboard functionality...');
-  
-  // Add focus detection to all webviews
-  Object.keys(views).forEach(viewName => {
-    const view = views[viewName];
-    if (!view || !view.webContents) return;
-    
-    console.log(`Installing focus detection for view: ${viewName}`);
-    
-    // Listen to DOM events directly from webContents
-    view.webContents.on('dom-ready', () => {
-      console.log(`DOM ready for ${viewName}, installing focus handlers`);
-      
-      view.webContents.executeJavaScript(`
-        (function() {
-          // Remove existing listeners to prevent duplicates
-          if (window.keyboardFocusHandlersInstalled) {
-            console.log('Focus handlers already installed');
-            return;
+// Helper function to inject focus detection script reliably
+function injectFocusDetector(view, viewName) {
+  if (!view || !view.webContents || view.webContents.isDestroyed()) {
+    console.error(`[Debug] Skipping focus injection for invalid/destroyed view: ${viewName}`);
+    return;
+  }
+
+  // This script is injected into each webview to detect when an input is focused.
+  const script = `
+      (function() {
+        if (window.keyboardFocusHandlersInstalled) {
+          console.log('[FOCUS_DEBUG] Focus handlers already installed in ${viewName}.');
+          return;
+        }
+        window.keyboardFocusHandlersInstalled = true;
+        console.log('[FOCUS_DEBUG] Installing keyboard auto-focus handlers in ${viewName}.');
+
+        function isInputElement(element) {
+          if (!element) return false;
+          const tagName = element.tagName ? element.tagName.toLowerCase() : '';
+          const type = element.type ? element.type.toLowerCase() : '';
+          const isContentEditable = element.contentEditable === 'true' || element.getAttribute('contenteditable') === 'true';
+          return tagName === 'input' || tagName === 'textarea' || isContentEditable;
+        }
+
+        function notifyMainProcess(eventType) {
+          console.log('[FOCUS_DEBUG] Renderer: Notifying main of "' + eventType + '" for view "' + '${viewName}' + '".');
+          if (window.electronAPI && typeof window.electronAPI.inputFocused === 'function') {
+            if (eventType === 'focus') {
+              window.electronAPI.inputFocused('${viewName}');
+            } else {
+              window.electronAPI.inputBlurred('${viewName}');
+            }
+          } else {
+            console.error('[FOCUS_DEBUG] electronAPI not available or methods are missing in ${viewName}.');
           }
-          window.keyboardFocusHandlersInstalled = true;
-          
-          console.log('Installing keyboard auto-focus handlers');
-          
-          function isInputElement(element) {
-            if (!element) return false;
-            
-            const tagName = element.tagName ? element.tagName.toLowerCase() : '';
-            const type = element.type ? element.type.toLowerCase() : '';
-            const contentEditable = element.contentEditable;
-            
-            return (
-              tagName === 'input' ||
-              tagName === 'textarea' ||
-              contentEditable === 'true' ||
-              contentEditable === true ||
-              element.getAttribute('contenteditable') === 'true' ||
-              element.hasAttribute('contenteditable')
-            );
+        }
+
+        function handleFocus(event) {
+          if (isInputElement(event.target)) {
+            console.log('[FOCUS_DEBUG] Input element focused in ${viewName}:', { tag: event.target.tagName, type: event.target.type });
+            notifyMainProcess('focus');
           }
-          
-          function notifyMainProcess(eventType, elementInfo) {
-            // Try multiple ways to send the message
-            console.log('Trying to notify main process:', eventType, elementInfo);
-            
-            // Method 1: ipcRenderer (if available)
-            try {
-              if (window.electronAPI) {
-                if (eventType === 'focus') {
-                  window.electronAPI.inputFocused();
-                  console.log('? Sent via electronAPI.inputFocused');
-                  return;
-                } else {
-                  window.electronAPI.inputBlurred();
-                  console.log('? Sent via electronAPI.inputBlurred');
-                  return;
-                }
+        }
+
+        function handleBlur(event) {
+          if (isInputElement(event.target)) {
+            console.log('[FOCUS_DEBUG] Input element blurred in ${viewName}:', { tag: event.target.tagName, type: event.target.type });
+            // Delay to check if focus moves to another input
+            setTimeout(() => {
+              if (!document.activeElement || !isInputElement(document.activeElement)) {
+                console.log('[FOCUS_DEBUG] No new input focused. Sending blur event for ${viewName}.');
+                notifyMainProcess('blur');
               }
-            } catch (e) {
-              console.log('? electronAPI failed:', e);
-            }
-            
-            // Method 2: Try to use postMessage
-            try {
-              window.postMessage({
-                type: 'keyboard-event',
-                event: eventType,
-                element: elementInfo
-              }, '*');
-              console.log('? Sent via postMessage');
-            } catch (e) {
-              console.log('? postMessage failed:', e);
-            }
-            
-            // Method 3: Try console message (we can listen for this)
-            console.log('KEYBOARD_EVENT:' + eventType + ':' + JSON.stringify(elementInfo));
+            }, 100);
           }
-          
-          function handleFocus(event) {
-            const target = event.target;
-            if (isInputElement(target)) {
-              const elementInfo = {
-                tagName: target.tagName,
-                type: target.type || 'no-type',
-                id: target.id || 'no-id',
-                className: target.className || 'no-class'
-              };
-              
-              console.log('?? Input element focused:', elementInfo);
-              notifyMainProcess('focus', elementInfo);
-            }
-          }
-          
-          function handleBlur(event) {
-            const target = event.target;
-            if (isInputElement(target)) {
-              const elementInfo = {
-                tagName: target.tagName,
-                type: target.type || 'no-type'
-              };
-              
-              console.log('?? Input element blurred:', elementInfo);
-              
-              // Check if another input is getting focus after a short delay
-              setTimeout(() => {
-                const activeElement = document.activeElement;
-                const bodyElement = document.body;
-                
-                console.log('?? Checking active element after blur:', {
-                  activeTag: activeElement ? activeElement.tagName : 'null',
-                  activeType: activeElement ? activeElement.type : 'null',
-                  isInput: activeElement ? isInputElement(activeElement) : false,
-                  isBody: activeElement === bodyElement
-                });
-                
-                if (!activeElement || activeElement === bodyElement || !isInputElement(activeElement)) {
-                  console.log('? No input focused anymore, sending blur event');
-                  notifyMainProcess('blur', elementInfo);
-                } else {
-                  console.log('??  Another input is focused, keeping keyboard open');
-                }
-              }, 100);
-            }
-          }
-          
-          // Add event listeners with capture to catch all events
-          document.addEventListener('focusin', handleFocus, true);
-          document.addEventListener('focusout', handleBlur, true);
-          
-          // Also try click events on inputs as backup
-          document.addEventListener('click', function(event) {
-            const target = event.target;
-            if (isInputElement(target)) {
-              console.log('??? Input clicked, triggering focus');
-              setTimeout(() => handleFocus(event), 10);
-            }
-          }, true);
-          
-          console.log('? Auto-keyboard handlers installed successfully');
-          
-          // Test the notification system
-          setTimeout(() => {
-            console.log('?? Testing notification system...');
-            notifyMainProcess('test', {test: true});
-          }, 1000);
-        })();
-      `).catch(e => {
-        console.error(`Failed to inject focus detection for ${viewName}:`, e);
+        }
+
+        document.addEventListener('focusin', handleFocus, true);
+        document.addEventListener('focusout', handleBlur, true);
+        console.log('[FOCUS_DEBUG] Auto-keyboard handlers installed successfully in ${viewName}.');
+      })();
+  `;
+
+  const doInjection = () => {
+      console.log(`[Debug] Attempting to inject focus script into ${viewName}.`);
+      view.webContents.executeJavaScript(script).catch(err => {
+          console.error(`[Debug] FAILED to inject focus script into ${viewName}:`, err);
       });
-    });
-    
-    // Listen for console messages from the webview
-    view.webContents.on('console-message', (event, level, message, line, sourceId) => {
-      if (message.includes('KEYBOARD_EVENT:focus:')) {
-        console.log('?? Detected input focus via console message');
-        showKeyboardView();
-      } else if (message.includes('KEYBOARD_EVENT:blur:')) {
-        console.log('?? Detected input blur via console message');
-        // Auto-hide keyboard
-        if (keyboardVisible) {
-          setTimeout(() => {
-            console.log('Auto-hiding keyboard after blur detection');
-            hideKeyboardView();
-          }, 300);
-        }
-      } else if (message.includes('Input element focused:')) {
-        console.log('?? Detected input focus via log message');
-        showKeyboardView();
-      } else if (message.includes('No input focused anymore')) {
-        console.log('?? Detected complete input blur via log message');
-        if (keyboardVisible) {
-          setTimeout(() => {
-            console.log('Auto-hiding keyboard after complete blur');
-            hideKeyboardView();
-          }, 300);
-        }
-      } else if (message.includes('Testing notification system')) {
-        console.log('?? Notification system test received from', viewName);
+  };
+
+  // Prevent race condition by checking if the view is already loaded.
+  if (view.webContents.isLoading()) {
+      view.webContents.once('dom-ready', doInjection);
+  } else {
+      doInjection();
+  }
+}
+
+function setupAutoKeyboard() {
+  console.log('[Debug] Setting up auto-keyboard for all views...');
+
+  // Combine all views (tabs and static views) into one object to iterate over.
+  const allViews = { ...views, settings: settingsView };
+
+  Object.entries(allViews).forEach(([viewName, view]) => {
+      if (!view || view.webContents.isDestroyed()) {
+          console.log(`[Debug] Skipping setup for invalid or destroyed view: ${viewName}`);
+          return;
       }
-    });
-    
-    console.log(`? Auto-keyboard setup completed for view: ${viewName}`);
+
+      injectFocusDetector(view, viewName);
+
+      // Keep console message listener as a fallback, though it's not the primary method.
+      view.webContents.on('console-message', (event, level, message) => {
+          if (message.includes('KEYBOARD_EVENT:focus:')) {
+              console.log(`?? Detected input focus via CONSOLE message from ${viewName}`);
+              showKeyboardView();
+          } else if (message.includes('KEYBOARD_EVENT:blur:')) {
+              console.log(`?? Detected input blur via CONSOLE message from ${viewName}`);
+              if (keyboardVisible && autoCloseEnabled) {
+                  hideKeyboardView();
+              }
+          }
+      });
   });
 }
 
@@ -743,24 +665,28 @@ ipcMain.on('keyboard-height-changed', (event, height) => {
 });
 
 // Auto-focus keyboard handlers
-ipcMain.on('input-focused', () => {
-  console.log('Input focused - auto-showing keyboard');
+ipcMain.on('input-focused', (event, viewName) => {
+  console.log(`[FOCUS_DEBUG] Main process received 'input-focused' from view: ${viewName}.`);
   if (!keyboardVisible) {
+    console.log('[FOCUS_DEBUG] Keyboard not visible, showing it now.');
     showKeyboardView();
+  } else {
+    console.log('[FOCUS_DEBUG] Keyboard already visible, not showing again.');
   }
 });
 
-ipcMain.on('input-blurred', () => {
-  console.log('Input blurred - auto-hiding keyboard');
-  // Auto-hide keyboard when input loses focus (if enabled)
+ipcMain.on('input-blurred', (event, viewName) => {
+  console.log(`[FOCUS_DEBUG] Main process received 'input-blurred' from view: ${viewName}.`);
   if (keyboardVisible && autoCloseEnabled) {
+    console.log('[FOCUS_DEBUG] Keyboard is visible and auto-close is enabled. Hiding keyboard after delay.');
     setTimeout(() => {
-      // Double-check if keyboard is still visible and no manual toggle happened
       if (keyboardVisible && autoCloseEnabled) {
-        console.log('Auto-hiding keyboard after input blur');
+        console.log('[FOCUS_DEBUG] Auto-hiding keyboard now.');
         hideKeyboardView();
       }
-    }, 300); // Small delay to prevent flicker when switching between inputs
+    }, 300);
+  } else {
+    console.log('[FOCUS_DEBUG] Keyboard not visible or auto-close is disabled. Not hiding.');
   }
 });
 

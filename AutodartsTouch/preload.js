@@ -28,8 +28,8 @@ contextBridge.exposeInMainWorld('api', {
 
 // API for settings and other webviews
 contextBridge.exposeInMainWorld('electronAPI', {
-  inputFocused: () => ipcRenderer.send('input-focused'),
-  inputBlurred: () => ipcRenderer.send('input-blurred'),
+  inputFocused: (viewName) => ipcRenderer.send('input-focused', viewName),
+  inputBlurred: (viewName) => ipcRenderer.send('input-blurred', viewName),
   getKeyboardLayouts: () => ipcRenderer.invoke('get-keyboard-layouts'),
   getKeyboardLayoutData: (layoutName) => ipcRenderer.invoke('get-keyboard-layout-data', layoutName),
   getSettings: () => ipcRenderer.invoke('get-settings'),
