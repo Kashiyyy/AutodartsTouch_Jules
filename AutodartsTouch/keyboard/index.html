@@ -235,33 +235,23 @@
     let umlautMappings = {};
 
     async function loadLayout(layoutName) {
-      const safeLayoutName = layoutName.replace(/[^a-zA-Z0-9_-]/g, '');
-      if (!safeLayoutName) {
-        console.error('[KB_DEBUG] Invalid layout name provided.');
-        return Promise.reject('Invalid layout name');
-      }
-
+      console.log(`Requesting layout module for '${layoutName}'...`);
       try {
-        console.log(`[KB_DEBUG] 6. Requesting layout data for '${safeLayoutName}'...`);
-        const layoutData = await window.electronAPI.getKeyboardLayoutData(safeLayoutName);
-        if (!layoutData) {
-          throw new Error(`No layout data returned for '${safeLayoutName}' from main process.`);
-        }
-        console.log(`[KB_DEBUG] 7. Received layout data. Executing...`);
+        // Request the layout module directly from the main process.
+        const layoutModule = await window.electronAPI.getKeyboardLayoutData(layoutName);
 
-        eval(layoutData);
-        console.log('[KB_DEBUG] 7a. eval() complete.');
-
-        if (window.keyboardLayouts && window.umlautMappings) {
-          layouts = window.keyboardLayouts;
-          umlautMappings = window.umlautMappings;
-          console.log(`[KB_DEBUG] 7b. Layout variables assigned successfully.`);
-          return Promise.resolve();
-        } else {
-          throw new Error(`Layout data for '${safeLayoutName}' did not define window.keyboardLayouts or window.umlautMappings.`);
+        if (!layoutModule || !layoutModule.keyboardLayouts || !layoutModule.umlautMappings) {
+          throw new Error(`Invalid or incomplete layout module received for '${layoutName}'.`);
         }
+
+        // Directly assign the data from the module.
+        layouts = layoutModule.keyboardLayouts;
+        umlautMappings = layoutModule.umlautMappings;
+
+        console.log(`Layout module for '${layoutName}' loaded successfully.`);
+        return Promise.resolve();
       } catch (error) {
-        console.error(`[KB_DEBUG] Error in loadLayout for '${safeLayoutName}':`, error);
+        console.error(`Failed to load layout module for '${layoutName}':`, error);
         return Promise.reject(error);
       }
     }

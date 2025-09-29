@@ -619,7 +619,6 @@ ipcMain.handle('get-keyboard-layout-data', async (event, layoutName) => {
 
   try {
     const files = await fs.promises.readdir(layoutDir);
-    // Perform a case-insensitive search for the file.
     const targetFile = files.find(file =>
       path.basename(file, '.js').toLowerCase() === requestedLayout
     );
@@ -630,10 +629,14 @@ ipcMain.handle('get-keyboard-layout-data', async (event, layoutName) => {
     }
 
     const layoutPath = path.join(layoutDir, targetFile);
-    console.log(`Reading layout file from: ${layoutPath}`);
-    return await fs.promises.readFile(layoutPath, 'utf-8');
+    console.log(`Loading layout module from: ${layoutPath}`);
+    // Load the layout as a Node.js module
+    const layoutData = require(layoutPath);
+    // Invalidate the cache to allow for potential live-reloading in the future
+    delete require.cache[require.resolve(layoutPath)];
+    return layoutData;
   } catch (error) {
-    console.error(`FATAL: Could not read layouts directory at ${layoutDir}.`, error);
+    console.error(`FATAL: Could not load layout module for '${layoutName}'.`, error);
     return null;
   }
 });
