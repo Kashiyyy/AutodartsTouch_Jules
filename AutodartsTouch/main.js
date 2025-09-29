@@ -1,5 +1,6 @@
 const { app, BrowserWindow, BrowserView, ipcMain, screen } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const Store = require('electron-store');
 const { exec } = require('child_process');
 
@@ -10,6 +11,7 @@ let views = {};
 let toolbarView;
 let keyboardView;
 let settingsView;
+let powerMenuView;
 let currentView = 'tab0'; // Default to the first tab
 let previousView = null;
 
@@ -20,7 +22,7 @@ let shiftActive = false;
 let keyboardActualHeight = 300; // Dynamic keyboard height
 let autoCloseEnabled = true; // Option to disable auto-close
 
-function createWindow() {
+async function createWindow() {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
 
   mainWindow = new BrowserWindow({
@@ -35,63 +37,110 @@ function createWindow() {
     }
   });
 
-  // Load tab settings from store
+  // Create static views that are never reloaded
+  settingsView = new BrowserView({ webPreferences: { sandbox: false, preload: path.join(__dirname, 'preload.js') } });
+  mainWindow.addBrowserView(settingsView);
+  settingsView.webContents.loadFile(path.join(__dirname, 'settings.html'));
+
+  powerMenuView = new BrowserView({
+    webPreferences: { contextIsolation: true, sandbox: false, preload: path.join(__dirname, 'preload.js') },
+    transparent: true
+  });
+  mainWindow.addBrowserView(powerMenuView);
+  powerMenuView.webContents.loadFile(path.join(__dirname, 'power-menu.html'));
+
+  // Load dynamic views for the first time
+  await reloadDynamicViews();
+
+  mainWindow.on('resize', () => {
+    if (mainWindow && !mainWindow.isDestroyed() && toolbarView) {
+      showTab(currentView);
+      if (keyboardVisible) updateKeyboardBounds();
+    }
+  });
+}
+
+function createDynamicViews() {
+  const loadingPromises = [];
+
+  // Tab views
   const tabs = store.get('tabs', [
     { name: 'Autodarts', url: 'https://play.autodarts.io/' },
     { name: 'Service', url: 'http://localhost:3180/' }
   ]);
-
-  // Create BrowserViews for each configured tab
   tabs.forEach((tab, index) => {
-    if (tab.url) {
+    if (tab && tab.url && tab.url.trim() !== '') {
       const view = new BrowserView({ webPreferences: { sandbox: false, preload: path.join(__dirname, 'preload.js') } });
-      view.webContents.loadURL(tab.url).catch(e => console.error(`tab${index} load error:`, e));
       mainWindow.addBrowserView(view);
       views[`tab${index}`] = view;
+      loadingPromises.push(view.webContents.loadURL(tab.url).catch(e => console.error(`tab${index} load error:`, e)));
     }
   });
-
-  // Settings view
-  settingsView = new BrowserView({ webPreferences: { sandbox: false, preload: path.join(__dirname, 'preload.js') } });
-  settingsView.webContents.loadFile(path.join(__dirname, 'settings.html')).catch(e => console.error('settings load', e));
-  mainWindow.addBrowserView(settingsView);
 
   // Toolbar view
   toolbarView = new BrowserView({
     webPreferences: { contextIsolation: true, sandbox: false, preload: path.join(__dirname, 'preload.js') }
   });
-  toolbarView.webContents.loadFile(path.join(__dirname, 'index.html')).catch(e => console.error('toolbar load', e));
   mainWindow.addBrowserView(toolbarView);
+  loadingPromises.push(toolbarView.webContents.loadFile(path.join(__dirname, 'index.html')));
 
   // Keyboard view
+  const keyboardLayout = store.get('keyboard.layout', 'de');
   keyboardView = new BrowserView({
-    webPreferences: { contextIsolation: true, sandbox: false, preload: path.join(__dirname, 'preload.js') }
+    webPreferences: { contextIsolation: true, sandbox: false, preload: path.join(__dirname, 'preload.js') },
+    transparent: true
   });
-  keyboardView.webContents.loadFile(path.join(__dirname, 'keyboard', 'index.html')).catch(e => console.error('keyboard load', e));
+  mainWindow.addBrowserView(keyboardView);
+  // The keyboard now fetches its own layout, so we don't need to pass it as a query param.
+  loadingPromises.push(keyboardView.webContents.loadFile(path.join(__dirname, 'keyboard', 'index.html')));
 
-  // Determine the initial tab to show
-  const initialTab = Object.keys(views).length > 0 ? 'tab0' : null;
-  if (initialTab) {
-    showTab(initialTab);
+  return Promise.all(loadingPromises).catch(e => console.error('Error loading one or more dynamic views:', e));
+}
+
+async function reloadDynamicViews() {
+  console.log('Reloading dynamic views...');
+  if (!mainWindow) return;
+
+  // 1. Destroy only the dynamic views
+  const dynamicViews = [
+    ...Object.values(views),
+    toolbarView,
+    keyboardView,
+  ];
+  dynamicViews.forEach(view => {
+    if (view && !view.webContents.isDestroyed()) {
+      mainWindow.removeBrowserView(view);
+      view.webContents.destroy();
+    }
+  });
+
+  // 2. Reset dynamic view containers
+  views = {};
+  toolbarView = null;
+  keyboardView = null;
+  keyboardVisible = false;
+
+  // 3. Re-create dynamic views and wait for them to load
+  try {
+    await createDynamicViews();
+    console.log('Dynamic views finished loading.');
+  } catch (error) {
+    console.error('An error occurred during dynamic view reload:', error);
+    return;
   }
 
-  applySettings();
+  // 4. Determine initial tab and layout the UI
+  let firstAvailableTab = Object.keys(views).length > 0 ? 'tab0' : null;
+  currentView = firstAvailableTab;
+  showTab(currentView);
 
-  // Setup auto-keyboard after views are ready
+  // 5. Apply settings and run setup
+  applySettings();
   setTimeout(() => {
     setupAutoKeyboard();
   }, 1000);
-  
-  // Additional setup for localhost (might need more time to load)
-  setTimeout(() => {
-    console.log('Re-running auto-keyboard setup for localhost pages...');
-    setupAutoKeyboard();
-  }, 3000);
 
-  mainWindow.on('resize', () => {
-    showTab(currentView);
-    if (keyboardVisible) updateKeyboardBounds();
-  });
+  console.log('Dynamic views reloaded successfully.');
 }
 
 function showTab(tab) {
@@ -164,26 +213,16 @@ function showKeyboardView() {
   if (!keyboardVisible) {
     console.log('Showing keyboard view');
     
-    // Reset keyboard to default state
     if (keyboardView && keyboardView.webContents) {
-      keyboardView.webContents.executeJavaScript(`
-        if (window.showKeyboard) {
-          window.showKeyboard();
-        }
-      `).catch(e => console.error('Failed to reset keyboard:', e));
+      keyboardView.webContents.executeJavaScript('window.showKeyboard && window.showKeyboard()').catch(e => console.error('Failed to reset keyboard:', e));
     }
     
-    mainWindow.addBrowserView(keyboardView);
     keyboardVisible = true;
     
-    // Apply custom styles
     applyKeyboardStyle();
-
-    // Initial layout with default height
-    showTab(currentView);
-    updateKeyboardBounds();
+    showTab(currentView); // This will resize the main view
+    updateKeyboardBounds(); // This will position the keyboard correctly
     
-    // Measure actual height after a delay to ensure DOM is ready
     setTimeout(() => {
       measureKeyboardHeight();
     }, 100);
@@ -193,64 +232,46 @@ function showKeyboardView() {
 function hideKeyboardView() {
   if (keyboardVisible) {
     console.log('Hiding keyboard view');
-    try { 
-      mainWindow.removeBrowserView(keyboardView); 
-    } catch(e) {
-      console.error('Error removing keyboard view:', e);
-    }
     keyboardVisible = false;
     
+    // Move keyboard off-screen instead of removing it
+    if (mainWindow && keyboardView) {
+      const [w, h] = mainWindow.getSize();
+      keyboardView.setBounds({ x: 0, y: h, width: w, height: keyboardActualHeight });
+    }
+
     // Update layout without keyboard
     showTab(currentView);
   }
 }
 
 function measureKeyboardHeight() {
-  // Try to get the actual keyboard height from the DOM
+  // This function is now a fallback. The primary method is the IPC listener below.
   if (keyboardView && keyboardView.webContents) {
-    keyboardView.webContents.executeJavaScript(`
-      (function() {
-        const keyboardElement = document.getElementById('keyboard');
-        if (keyboardElement) {
-          // Force a layout reflow
-          keyboardElement.offsetHeight;
-          
-          // Get the pure element height - this is what we actually need
-          const elementHeight = keyboardElement.offsetHeight;
-          
-          console.log('Keyboard measurements:');
-          console.log('- Pure element height:', elementHeight, '<-- This is what we need');
-          console.log('- Window height:', window.innerHeight);
-          console.log('- Body height:', document.body.offsetHeight);
-          
-          return {
-            height: elementHeight, // Use pure element height
-            elementHeight: elementHeight,
-            windowHeight: window.innerHeight,
-            bodyHeight: document.body.offsetHeight
-          };
+    keyboardView.webContents.executeJavaScript('document.getElementById("keyboard")?.offsetHeight || 0')
+    .then(height => {
+      console.log(`Measured keyboard height via JS execution: ${height}px`);
+      if (height > 100) { // Only accept reasonable heights
+        if (keyboardActualHeight !== height) {
+          console.log(`Updating keyboard height to ${height}px`);
+          keyboardActualHeight = height;
+          if (keyboardVisible) {
+            updateKeyboardBounds();
+            showTab(currentView);
+          }
         }
-        return { height: 300, elementHeight: 0, windowHeight: 0, bodyHeight: 0 };
-      })();
-    `).then(result => {
-      console.log('Keyboard measurement result:', result);
-      
-      if (result && result.elementHeight > 0) {
-        // Use the pure element height directly
-        const newHeight = result.elementHeight;
-        console.log(`Setting keyboard height to pure element height: ${newHeight}px (was ${keyboardActualHeight}px)`);
-        keyboardActualHeight = newHeight;
-        
-        // Immediately update layout
-        if (keyboardVisible) {
-          updateKeyboardBounds();
-          showTab(currentView);
+      } else {
+        console.warn(`Measured height (${height}px) is too small. Using fallback height.`);
+        // If measurement is invalid, use a safe fallback but still update layout
+        keyboardActualHeight = 250;
+        if(keyboardVisible) {
+            updateKeyboardBounds();
+            showTab(currentView);
         }
       }
     }).catch(e => {
-      console.error('Failed to measure keyboard height:', e);
-      // Fallback to a reasonable default
-      keyboardActualHeight = 220;
+      console.error('Failed to measure keyboard height via JS, using fallback.', e);
+      keyboardActualHeight = 250;
       if (keyboardVisible) {
         updateKeyboardBounds();
         showTab(currentView);
@@ -513,6 +534,18 @@ ipcMain.on('refresh', () => {
   const view = (currentView === 'settings') ? settingsView : views[currentView];
   if (view) view.webContents.reload();
 });
+
+ipcMain.on('force-reload', () => {
+  const view = views[currentView];
+  if (view) {
+    const tabs = store.get('tabs', []);
+    const tabIndex = parseInt(currentView.replace('tab', ''), 10);
+    if (tabs[tabIndex] && tabs[tabIndex].url) {
+      view.webContents.loadURL(tabs[tabIndex].url);
+    }
+  }
+});
+
 ipcMain.on('toggle-webkeyboard', () => {
   // Prevent hiding the keyboard while in the settings view
   if (currentView === 'settings') {
@@ -522,11 +555,98 @@ ipcMain.on('toggle-webkeyboard', () => {
   toggleKeyboardView();
 });
 
+ipcMain.on('open-power-menu', () => {
+    if (mainWindow && powerMenuView && !powerMenuView.webContents.isDestroyed()) {
+        const [w, h] = mainWindow.getSize();
+        // Set the bounds to cover the screen and bring it to the top.
+        powerMenuView.setBounds({ x: 0, y: 0, width: w, height: h });
+        mainWindow.setTopBrowserView(powerMenuView);
+    }
+});
+
+ipcMain.on('close-power-menu', () => {
+    if (mainWindow && powerMenuView && !powerMenuView.webContents.isDestroyed()) {
+        const [w, h] = mainWindow.getSize();
+        // Hide the power menu by moving it off-screen.
+        powerMenuView.setBounds({ x: 0, y: h, width: w, height: h });
+    }
+});
+
+ipcMain.on('power-control', (event, action) => {
+  // Add a layer of security/confirmation if needed in a real-world scenario
+  switch (action) {
+    case 'shutdown':
+      exec('shutdown -h now', (err) => {
+        if (err) console.error('Shutdown command failed:', err);
+      });
+      break;
+    case 'restart':
+      exec('reboot', (err) => {
+        if (err) console.error('Restart command failed:', err);
+      });
+      break;
+    case 'close-app':
+      app.quit();
+      break;
+  }
+});
+
+ipcMain.handle('get-keyboard-layouts', async () => {
+  // In an Electron app, `__dirname` correctly points to the directory of the current file.
+  // When packaged into an asar, this path allows fs to read directly from the archive.
+  // This is the most reliable way to access bundled resources.
+  const layoutDir = path.join(__dirname, 'keyboard', 'layouts');
+  try {
+    console.log(`Reading keyboard layouts from: ${layoutDir}`);
+    const files = await fs.promises.readdir(layoutDir);
+    return files
+      .filter(file => file.endsWith('.js'))
+      .map(file => file.replace('.js', ''));
+  } catch (error) {
+    console.error(`FATAL: Could not read keyboard layouts from ${layoutDir}.`, error);
+    return [];
+  }
+});
+
+ipcMain.handle('get-keyboard-layout-data', async (event, layoutName) => {
+  const requestedLayout = (layoutName || '').toLowerCase();
+  if (!requestedLayout) {
+    console.error('Request for invalid or empty layout name rejected.');
+    return null;
+  }
+
+  const layoutDir = path.join(__dirname, 'keyboard', 'layouts');
+
+  try {
+    const files = await fs.promises.readdir(layoutDir);
+    const targetFile = files.find(file =>
+      path.basename(file, '.js').toLowerCase() === requestedLayout
+    );
+
+    if (!targetFile) {
+      console.error(`Layout file not found for '${layoutName}' in directory ${layoutDir}`);
+      return null;
+    }
+
+    const layoutPath = path.join(layoutDir, targetFile);
+    console.log(`Loading layout module from: ${layoutPath}`);
+    // Load the layout as a Node.js module
+    const layoutData = require(layoutPath);
+    // Invalidate the cache to allow for potential live-reloading in the future
+    delete require.cache[require.resolve(layoutPath)];
+    return layoutData;
+  } catch (error) {
+    console.error(`FATAL: Could not load layout module for '${layoutName}'.`, error);
+    return null;
+  }
+});
+
 ipcMain.handle('get-settings', async () => {
   return {
     volume: store.get('volume', 50),
     keyboardWidth: store.get('keyboard.width', 100),
     keyHeight: store.get('keyboard.keyHeight', 50),
+    keyboardLayout: store.get('keyboard.layout', 'de'),
     tabs: store.get('tabs', [
       { name: 'Autodarts', url: 'https://play.autodarts.io/' },
       { name: 'Service', url: 'http://localhost:3180/' }
@@ -534,30 +654,46 @@ ipcMain.handle('get-settings', async () => {
   };
 });
 
-ipcMain.on('save-settings', (event, settings) => {
+ipcMain.on('save-settings', async (event, settings) => {
+  console.log('Saving settings...');
   store.set('volume', settings.volume);
   store.set('keyboard.width', settings.keyboardWidth);
   store.set('keyboard.keyHeight', settings.keyHeight);
+  store.set('keyboard.layout', settings.keyboardLayout);
   store.set('tabs', settings.tabs);
 
-  applySettings(); // Apply and save the settings
+  // Apply settings that don't require a reload
+  applySettings();
 
-  // Inform the user that a restart is required for tab changes to take effect
-  // This is a simple way to handle dynamic view recreation
-  if (previousView) {
-    showTab(previousView);
-  }
+  // Defer the reload to prevent the app from crashing.
+  // This gives the settings view time to close before views are recreated.
+  setTimeout(async () => {
+    await reloadDynamicViews();
+
+    // After the reload, switch back to the previous view or a fallback.
+    if (previousView && views[previousView]) {
+      showTab(previousView);
+    } else {
+      const firstTab = Object.keys(views).find(k => k.startsWith('tab'));
+      showTab(firstTab || null);
+    }
+    previousView = null;
+    autoCloseEnabled = true;
+    console.log('Settings saved and dynamic views reloaded successfully.');
+  }, 100); // A short delay is sufficient
+
+  // Hide the keyboard and settings view immediately.
   hideKeyboardView();
-  autoCloseEnabled = true;
+});
 
-  // Optional: Add a dialog to inform the user about the restart.
-  const { dialog } = require('electron');
-  dialog.showMessageBox(mainWindow, {
-    type: 'info',
-    title: 'Einstellungen gespeichert',
-    message: 'Die Tab-Einstellungen wurden gespeichert. Bitte starten Sie die Anwendung neu, damit die Änderungen wirksam werden.',
-    buttons: ['OK']
-  });
+ipcMain.on('set-cursor-visibility', (event, visible) => {
+    const css = `* { cursor: ${visible ? 'default' : 'none'} !important; }`;
+    const allViews = [...Object.values(views), toolbarView, settingsView, keyboardView, powerMenuView];
+    allViews.forEach(view => {
+        if (view && view.webContents && !view.webContents.isDestroyed()) {
+            view.webContents.insertCSS(css).catch(e => console.error(`Failed to set cursor visibility for a view: ${e}`));
+        }
+    });
 });
 
 ipcMain.handle('get-tabs', async () => {
@@ -583,12 +719,22 @@ ipcMain.on('update-keyboard-style-live', (event, style) => {
   applyKeyboardStyle(style);
 });
 
-// Keyboard height update from keyboard view
-ipcMain.on('keyboard-height-changed', (ev, height) => {
-  if (height && height > 0) {
-    console.log(`Keyboard height update via IPC: ${height}px (was ${keyboardActualHeight}px)`);
-    keyboardActualHeight = height;
-    
+ipcMain.on('keyboard-height-changed', (event, height) => {
+  // This is the primary method for updating keyboard height.
+  // It's triggered by the renderer process once the keyboard is fully rendered.
+  if (height && height > 100) { // Only accept reasonable heights
+    if (keyboardActualHeight !== height) {
+      console.log(`IPC: Keyboard height updated to ${height}px`);
+      keyboardActualHeight = height;
+      if (keyboardVisible) {
+        updateKeyboardBounds();
+        showTab(currentView);
+      }
+    }
+  } else {
+    console.warn(`IPC: Received invalid keyboard height: ${height}px. Using fallback.`);
+    // If the received height is invalid, use a safe fallback.
+    keyboardActualHeight = 250;
     if (keyboardVisible) {
       updateKeyboardBounds();
       showTab(currentView);

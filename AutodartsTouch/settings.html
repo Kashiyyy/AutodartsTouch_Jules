@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Einstellungen</title>
+  <title>Settings</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body {
@@ -10,7 +10,7 @@
       color: #fff;
       padding: 20px;
       margin: 0;
-      height: 100vh;
+      min-height: 100vh;
       box-sizing: border-box;
       background-image:
         radial-gradient(50% 30% at 86% 0%, #313370e3, #40348600),
@@ -23,11 +23,32 @@
         radial-gradient(75% 75% at 50% 50%, #3662b9 1%, #2d285b);
       background-repeat: no-repeat;
       background-size: cover;
+      background-attachment: fixed;
     }
-    h1 { text-align: center; }
-    .setting { margin-bottom: 20px; max-width: 600px; margin-left: auto; margin-right: auto; }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background-color: rgba(0, 0, 0, 0.2);
+      padding: 20px;
+      border-radius: 10px;
+    }
+    h1, h2 { text-align: center; }
+    .setting { margin-bottom: 20px; }
     label { display: block; margin-bottom: 5px; }
-    input[type="range"] { width: 100%; }
+    input[type="range"], input[type="text"], select {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 8px;
+      border-radius: 4px;
+      border: 1px solid #555;
+      background-color: #222;
+      color: #fff;
+    }
+    .tab-setting-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
     .buttons { text-align: center; margin-top: 30px; }
     button {
       background-color: #525254;
@@ -46,96 +67,114 @@
   </style>
 </head>
 <body>
-  <h1>Einstellungen</h1>
+  <div class="container">
+    <h1>Settings</h1>
 
-  <div class="setting">
-    <label for="volume">Systemlautstärke</label>
-    <input type="range" id="volume" min="0" max="100" value="50">
-  </div>
+    <div class="setting">
+      <label for="volume">System Volume</label>
+      <input type="range" id="volume" min="0" max="100" value="50">
+    </div>
 
-  <div class="setting">
-    <label for="keyboardWidth">Breite der Tastatur (%)</label>
-    <input type="range" id="keyboardWidth" min="50" max="100" value="100">
-  </div>
+    <div class="setting">
+      <label for="keyboardWidth">Keyboard Width (%)</label>
+      <input type="range" id="keyboardWidth" min="50" max="100" value="100">
+    </div>
 
-  <div class="setting">
-    <label for="keyHeight">Höhe der Tasten (px)</label>
-    <input type="range" id="keyHeight" min="30" max="80" value="50">
-  </div>
+    <div class="setting">
+      <label for="keyHeight">Key Height (px)</label>
+      <input type="range" id="keyHeight" min="30" max="80" value="50">
+    </div>
 
-  <div class="tabs-settings">
-    <h2>Tab-Einstellungen</h2>
-    <!-- Tab 1 -->
-    <div class="tab-setting">
-      <h3 style="color: #fff; text-align: center;">Tab 1</h3>
-      <div class="setting">
-        <label for="tabName1">Tab-Name</label>
-        <input type="text" id="tabName1" placeholder="z.B. Autodarts">
+    <div class="setting">
+      <label for="keyboardLayout">Keyboard Layout</label>
+      <select id="keyboardLayout"></select>
+    </div>
+
+    <div class="tabs-settings">
+      <h2>Tab Settings</h2>
+      <!-- Tab 1 -->
+      <div class="tab-setting">
+        <h3 style="color: #fff; text-align: center;">Tab 1</h3>
+        <div class="tab-setting-grid">
+          <div class="setting">
+            <label for="tabName1">Tab Name</label>
+            <input type="text" id="tabName1" placeholder="e.g., Autodarts">
+          </div>
+          <div class="setting">
+            <label for="tabUrl1">URL</label>
+            <input type="text" id="tabUrl1" placeholder="https://autodarts.io">
+          </div>
+        </div>
       </div>
-      <div class="setting">
-        <label for="tabUrl1">URL</label>
-        <input type="text" id="tabUrl1" placeholder="https://autodarts.io">
+      <!-- Tab 2 -->
+      <div class="tab-setting">
+        <h3 style="color: #fff; text-align: center;">Tab 2</h3>
+        <div class="tab-setting-grid">
+          <div class="setting">
+            <label for="tabName2">Tab Name</label>
+            <input type="text" id="tabName2" placeholder="e.g., Google">
+          </div>
+          <div class="setting">
+            <label for="tabUrl2">URL</label>
+            <input type="text" id="tabUrl2" placeholder="https://google.com">
+          </div>
+        </div>
+      </div>
+      <!-- Tab 3 -->
+      <div class="tab-setting">
+        <h3 style="color: #fff; text-align: center;">Tab 3</h3>
+        <div class="tab-setting-grid">
+          <div class="setting">
+            <label for="tabName3">Tab Name</label>
+            <input type="text" id="tabName3" placeholder="Name for Tab 3">
+          </div>
+          <div class="setting">
+            <label for="tabUrl3">URL</label>
+            <input type="text" id="tabUrl3" placeholder="URL for Tab 3">
+          </div>
+        </div>
+      </div>
+      <!-- Tab 4 -->
+      <div class="tab-setting">
+        <h3 style="color: #fff; text-align: center;">Tab 4</h3>
+        <div class="tab-setting-grid">
+          <div class="setting">
+            <label for="tabName4">Tab Name</label>
+            <input type="text" id="tabName4" placeholder="Name for Tab 4">
+          </div>
+          <div class="setting">
+            <label for="tabUrl4">URL</label>
+            <input type="text" id="tabUrl4" placeholder="URL for Tab 4">
+          </div>
+        </div>
+      </div>
+      <!-- Tab 5 -->
+      <div class="tab-setting">
+        <h3 style="color: #fff; text-align: center;">Tab 5</h3>
+        <div class="tab-setting-grid">
+          <div class="setting">
+            <label for="tabName5">Tab Name</label>
+            <input type="text" id="tabName5" placeholder="Name for Tab 5">
+          </div>
+          <div class="setting">
+            <label for="tabUrl5">URL</label>
+            <input type="text" id="tabUrl5" placeholder="URL for Tab 5">
+          </div>
+        </div>
       </div>
     </div>
-    <!-- Tab 2 -->
-    <div class="tab-setting">
-      <h3 style="color: #fff; text-align: center;">Tab 2</h3>
-      <div class="setting">
-        <label for="tabName2">Tab-Name</label>
-        <input type="text" id="tabName2" placeholder="z.B. Google">
-      </div>
-      <div class="setting">
-        <label for="tabUrl2">URL</label>
-        <input type="text" id="tabUrl2" placeholder="https://google.com">
-      </div>
-    </div>
-    <!-- Tab 3 -->
-    <div class="tab-setting">
-      <h3 style="color: #fff; text-align: center;">Tab 3</h3>
-      <div class="setting">
-        <label for="tabName3">Tab-Name</label>
-        <input type="text" id="tabName3" placeholder="Name für Tab 3">
-      </div>
-      <div class="setting">
-        <label for="tabUrl3">URL</label>
-        <input type="text" id="tabUrl3" placeholder="URL für Tab 3">
-      </div>
-    </div>
-    <!-- Tab 4 -->
-    <div class="tab-setting">
-      <h3 style="color: #fff; text-align: center;">Tab 4</h3>
-      <div class="setting">
-        <label for="tabName4">Tab-Name</label>
-        <input type="text" id="tabName4" placeholder="Name für Tab 4">
-      </div>
-      <div class="setting">
-        <label for="tabUrl4">URL</label>
-        <input type="text" id="tabUrl4" placeholder="URL für Tab 4">
-      </div>
-    </div>
-    <!-- Tab 5 -->
-    <div class="tab-setting">
-      <h3 style="color: #fff; text-align: center;">Tab 5</h3>
-      <div class="setting">
-        <label for="tabName5">Tab-Name</label>
-        <input type="text" id="tabName5" placeholder="Name für Tab 5">
-      </div>
-      <div class="setting">
-        <label for="tabUrl5">URL</label>
-        <input type="text" id="tabUrl5" placeholder="URL für Tab 5">
-      </div>
-    </div>
-  </div>
 
-  <div class="buttons">
-    <button id="saveBtn">Speichern & Schließen</button>
-    <button id="closeBtn">Schließen</button>
+    <div class="buttons">
+      <button id="saveBtn">Save & Close</button>
+      <button id="closeBtn">Close</button>
+    </div>
   </div>
 
   <script>
     const volumeSlider = document.getElementById('volume');
     const keyboardWidthSlider = document.getElementById('keyboardWidth');
     const keyHeightSlider = document.getElementById('keyHeight');
+    const keyboardLayoutSelect = document.getElementById('keyboardLayout');
     const saveBtn = document.getElementById('saveBtn');
     const closeBtn = document.getElementById('closeBtn');
 
@@ -165,13 +204,28 @@
       }
     }
 
-    // Load saved settings
-    if (window.electronAPI && window.electronAPI.getSettings) {
-      window.electronAPI.getSettings().then(settings => {
+    async function loadInitialData() {
+      if (!window.electronAPI) return;
+
+      // First, populate the layout dropdown
+      if (window.electronAPI.getKeyboardLayouts) {
+        const layouts = await window.electronAPI.getKeyboardLayouts();
+        layouts.forEach(layout => {
+            const option = document.createElement('option');
+            option.value = layout;
+            option.textContent = layout.toUpperCase();
+            keyboardLayoutSelect.appendChild(option);
+        });
+      }
+
+      // Then, load all saved settings
+      if (window.electronAPI.getSettings) {
+        const settings = await window.electronAPI.getSettings();
         if (settings) {
           if (settings.volume) volumeSlider.value = settings.volume;
           if (settings.keyboardWidth) keyboardWidthSlider.value = settings.keyboardWidth;
           if (settings.keyHeight) keyHeightSlider.value = settings.keyHeight;
+          if (settings.keyboardLayout) keyboardLayoutSelect.value = settings.keyboardLayout;
           if (settings.tabs) {
             settings.tabs.forEach((tab, index) => {
               if (tabNameInputs[index]) tabNameInputs[index].value = tab.name;
@@ -179,10 +233,12 @@
             });
           }
         }
-      });
+      }
     }
 
-    // Add listeners for live updates
+    loadInitialData();
+
+    // Add listeners for live-updates
     keyboardWidthSlider.addEventListener('input', sendLiveUpdate);
     keyHeightSlider.addEventListener('input', sendLiveUpdate);
 
@@ -202,6 +258,7 @@
         volume: volumeSlider.value,
         keyboardWidth: keyboardWidthSlider.value,
         keyHeight: keyHeightSlider.value,
+        keyboardLayout: keyboardLayoutSelect.value,
         tabs: tabs,
       };
 

@@ -13,8 +13,7 @@ set -euo pipefail
 
 # --- Configuration
 BRANCH_NAME="${1:-main}"
-GITHUB_REPO_URL="https://github.com/Kashiyyy/AutodartsTouch_Jules"
-GITHUB_RAW_URL="${GITHUB_REPO_URL/github.com/raw.githubusercontent.com}/${BRANCH_NAME}"
+GITHUB_REPO_URL="https://github.com/Kashiyyy/AutodartsTouch_Jules.git"
 
 # --- Environment
 GUI_USER="${SUDO_USER:-$(logname)}"
@@ -98,8 +97,8 @@ print_info "Updating package lists..."
 apt update
 print_info "Upgrading installed packages... (This may take a while)"
 apt upgrade -y
-print_info "Installing required packages: curl, build-essential, alsa-utils..."
-apt install -y curl build-essential alsa-utils || print_warning "Could not install all packages, but continuing."
+print_info "Installing required packages: curl, git, build-essential, alsa-utils..."
+apt install -y curl git build-essential alsa-utils || print_warning "Could not install all packages, but continuing."
 
 # --- Step 3: Node.js Installation
 print_header "Step 3: Installing Node.js"
@@ -133,32 +132,41 @@ fi
 
 # --- Step 5: Download Autodarts Touch Application
 print_header "Step 5: Downloading Autodarts Touch Files"
+# Clean up old directory
 rm -rf "$APP_DIR"
-mkdir -p "$APP_DIR"
+
+print_info "Cloning repository to a temporary directory..."
+TMP_DIR=$(mktemp -d)
+# The repo name is derived from the URL, e.g., "AutodartsTouch_Jules"
+REPO_NAME=$(basename "$GITHUB_REPO_URL" .git)
+CLONE_DIR="$TMP_DIR/$REPO_NAME"
+
+if ! git clone --depth 1 --branch "$BRANCH_NAME" "$GITHUB_REPO_URL" "$CLONE_DIR"; then
+  print_error "Failed to clone the repository. Please check the URL and your connection."
+fi
+
+# The application files are in the 'AutodartsTouch' subdirectory.
+SOURCE_SUBDIR="$CLONE_DIR/AutodartsTouch"
+
+# Check if the source subdirectory exists
+if [ ! -d "$SOURCE_SUBDIR" ]; then
+    print_error "The 'AutodartsTouch' subdirectory was not found in the repository."
+fi
+
+# Move the entire application subdirectory to the final destination
+print_info "Moving application files to $APP_DIR..."
+if ! mv "$SOURCE_SUBDIR" "$APP_DIR"; then
+    print_error "Failed to move application files."
+fi
+
+# Clean up the temporary directory
+rm -rf "$TMP_DIR"
+
+# Set ownership and permissions now that all files are in place
 chown -R "$GUI_USER:$GUI_USER" "$APP_DIR"
-
-download_file() {
-  local url="$1"
-  local dest="$2"
-  print_info "Downloading file to $dest"
-  if ! curl -sSL --fail -o "$dest" "$url"; then
-    print_error "Failed to download file from $url. Please check the URL and your connection."
-  fi
-  chown "$GUI_USER:$GUI_USER" "$dest"
-  chmod 644 "$dest"
-}
-
-download_file "$GITHUB_RAW_URL/AutodartsTouch/package.json" "$APP_DIR/package.json"
-download_file "$GITHUB_RAW_URL/AutodartsTouch/main.js" "$APP_DIR/main.js"
-download_file "$GITHUB_RAW_URL/AutodartsTouch/preload.js" "$APP_DIR/preload.js"
-download_file "$GITHUB_RAW_URL/AutodartsTouch/index.html" "$APP_DIR/index.html"
-download_file "$GITHUB_RAW_URL/AutodartsTouch/settings.html" "$APP_DIR/settings.html"
-download_file "$GITHUB_RAW_URL/AutodartsTouch/AutodartsTouch.sh" "$START_SCRIPT"
 chmod +x "$START_SCRIPT"
+print_success "Application files downloaded successfully to $APP_DIR."
 
-mkdir -p "$APP_DIR/keyboard"
-chown "$GUI_USER:$GUI_USER" "$APP_DIR/keyboard"
-download_file "$GITHUB_RAW_URL/AutodartsTouch/keyboard/index.html" "$APP_DIR/keyboard/index.html"
 
 # --- Step 6: Install Node.js Dependencies
 print_header "Step 6: Installing Application Dependencies"
