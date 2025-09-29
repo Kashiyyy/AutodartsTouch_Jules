@@ -91,9 +91,8 @@ function createDynamicViews() {
     transparent: true
   });
   mainWindow.addBrowserView(keyboardView);
-  loadingPromises.push(keyboardView.webContents.loadFile(path.join(__dirname, 'keyboard', 'index.html'), {
-    query: { layout: keyboardLayout }
-  }));
+  // The keyboard now fetches its own layout, so we don't need to pass it as a query param.
+  loadingPromises.push(keyboardView.webContents.loadFile(path.join(__dirname, 'keyboard', 'index.html')));
 
   return Promise.all(loadingPromises).catch(e => console.error('Error loading one or more dynamic views:', e));
 }
@@ -593,19 +592,53 @@ ipcMain.on('power-control', (event, action) => {
 });
 
 ipcMain.handle('get-keyboard-layouts', async () => {
-    // This is the correct path, relative to the main.js file.
-    const layoutDir = path.join(__dirname, 'keyboard', 'layouts');
-    console.log(`Attempting to read keyboard layouts from: ${layoutDir}`);
-    try {
-        const files = await fs.promises.readdir(layoutDir);
-        console.log(`Found layout files: ${files}`);
-        return files
-            .filter(file => file.endsWith('.js'))
-            .map(file => file.replace('.js', ''));
-    } catch (error) {
-        console.error(`FATAL: Failed to read keyboard layouts from ${layoutDir}. This is a critical error.`, error);
-        return []; // Return empty array on error to prevent crashing the settings page.
+  // In an Electron app, `__dirname` correctly points to the directory of the current file.
+  // When packaged into an asar, this path allows fs to read directly from the archive.
+  // This is the most reliable way to access bundled resources.
+  const layoutDir = path.join(__dirname, 'keyboard', 'layouts');
+  try {
+    console.log(`Reading keyboard layouts from: ${layoutDir}`);
+    const files = await fs.promises.readdir(layoutDir);
+    return files
+      .filter(file => file.endsWith('.js'))
+      .map(file => file.replace('.js', ''));
+  } catch (error) {
+    console.error(`FATAL: Could not read keyboard layouts from ${layoutDir}.`, error);
+    return [];
+  }
+});
+
+ipcMain.handle('get-keyboard-layout-data', async (event, layoutName) => {
+  const requestedLayout = (layoutName || '').toLowerCase();
+  if (!requestedLayout) {
+    console.error('Request for invalid or empty layout name rejected.');
+    return null;
+  }
+
+  const layoutDir = path.join(__dirname, 'keyboard', 'layouts');
+
+  try {
+    const files = await fs.promises.readdir(layoutDir);
+    const targetFile = files.find(file =>
+      path.basename(file, '.js').toLowerCase() === requestedLayout
+    );
+
+    if (!targetFile) {
+      console.error(`Layout file not found for '${layoutName}' in directory ${layoutDir}`);
+      return null;
     }
+
+    const layoutPath = path.join(layoutDir, targetFile);
+    console.log(`Loading layout module from: ${layoutPath}`);
+    // Load the layout as a Node.js module
+    const layoutData = require(layoutPath);
+    // Invalidate the cache to allow for potential live-reloading in the future
+    delete require.cache[require.resolve(layoutPath)];
+    return layoutData;
+  } catch (error) {
+    console.error(`FATAL: Could not load layout module for '${layoutName}'.`, error);
+    return null;
+  }
 });
 
 ipcMain.handle('get-settings', async () => {
@@ -622,7 +655,7 @@ ipcMain.handle('get-settings', async () => {
 });
 
 ipcMain.on('save-settings', async (event, settings) => {
-  console.log('Saving settings and reloading dynamic views...');
+  console.log('Saving settings...');
   store.set('volume', settings.volume);
   store.set('keyboard.width', settings.keyboardWidth);
   store.set('keyboard.keyHeight', settings.keyHeight);
@@ -632,22 +665,25 @@ ipcMain.on('save-settings', async (event, settings) => {
   // Apply settings that don't require a reload
   applySettings();
 
-  // Crucially, reload the dynamic views to apply changes
-  await reloadDynamicViews();
+  // Defer the reload to prevent the app from crashing.
+  // This gives the settings view time to close before views are recreated.
+  setTimeout(async () => {
+    await reloadDynamicViews();
 
-  // After the reload is complete, switch back to the previous view
-  if (previousView && views[previousView]) {
-    showTab(previousView);
-  } else {
-    // Fallback to the first available tab if the previous one is gone
-    const firstTab = Object.keys(views).find(k => k.startsWith('tab'));
-    showTab(firstTab || null);
-  }
+    // After the reload, switch back to the previous view or a fallback.
+    if (previousView && views[previousView]) {
+      showTab(previousView);
+    } else {
+      const firstTab = Object.keys(views).find(k => k.startsWith('tab'));
+      showTab(firstTab || null);
+    }
+    previousView = null;
+    autoCloseEnabled = true;
+    console.log('Settings saved and dynamic views reloaded successfully.');
+  }, 100); // A short delay is sufficient
 
-  previousView = null; // Reset state
+  // Hide the keyboard and settings view immediately.
   hideKeyboardView();
-  autoCloseEnabled = true;
-  console.log('Settings saved and dynamic views reloaded successfully.');
 });
 
 ipcMain.on('set-cursor-visibility', (event, visible) => {
