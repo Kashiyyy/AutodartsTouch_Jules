@@ -194,18 +194,6 @@
       document.getElementById('tabUrl5'),
     ];
 
-    function throttle(callback, delay) {
-      let last = 0;
-      return function (...args) {
-        const now = new Date().getTime();
-        if (now - last < delay) {
-          return;
-        }
-        last = now;
-        callback(...args);
-      };
-    }
-
     function sendLiveUpdate() {
       if (window.electronAPI && window.electronAPI.updateKeyboardStyleLive) {
         const style = {
@@ -252,9 +240,8 @@
     loadInitialData();
 
     // Add listeners for live-updates
-    const throttledSendLiveUpdate = throttle(sendLiveUpdate, 50);
-    keyboardWidthSlider.addEventListener('input', throttledSendLiveUpdate);
-    keyHeightSlider.addEventListener('input', throttledSendLiveUpdate);
+    keyboardWidthSlider.addEventListener('change', sendLiveUpdate);
+    keyHeightSlider.addEventListener('change', sendLiveUpdate);
     keyboardLayoutSelect.addEventListener('change', sendLiveUpdate);
 
     saveBtn.addEventListener('click', () => {
