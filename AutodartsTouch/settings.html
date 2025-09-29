@@ -199,6 +199,7 @@
         const style = {
           width: keyboardWidthSlider.value,
           keyHeight: keyHeightSlider.value,
+          layout: keyboardLayoutSelect.value,
         };
         window.electronAPI.updateKeyboardStyleLive(style);
       }
@@ -239,8 +240,9 @@
     loadInitialData();
 
     // Add listeners for live-updates
-    keyboardWidthSlider.addEventListener('input', sendLiveUpdate);
-    keyHeightSlider.addEventListener('input', sendLiveUpdate);
+    keyboardWidthSlider.addEventListener('change', sendLiveUpdate);
+    keyHeightSlider.addEventListener('change', sendLiveUpdate);
+    keyboardLayoutSelect.addEventListener('change', sendLiveUpdate);
 
     saveBtn.addEventListener('click', () => {
       const tabs = [];

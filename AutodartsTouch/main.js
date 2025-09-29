@@ -190,7 +190,37 @@ function showTab(tab) {
   }
 
   currentView = tab;
+
+  // Notify the toolbar that the active view has changed.
+  if (toolbarView && toolbarView.webContents && !toolbarView.webContents.isDestroyed()) {
+    toolbarView.webContents.send('active-view-changed', currentView);
+  }
+
   if (keyboardVisible) updateKeyboardBounds();
+}
+
+function updateMainViewBounds() {
+  if (!mainWindow) return;
+  const [w, h] = mainWindow.getSize();
+
+  // Determine the active view
+  const activeView = (currentView === 'settings') ? settingsView : views[currentView];
+  if (!activeView || !activeView.webContents || activeView.webContents.isDestroyed()) {
+    console.error(`updateMainViewBounds: Cannot resize invalid or destroyed active view: ${currentView}`);
+    return;
+  }
+
+  // Calculate available height for content
+  const availableHeight = h - TOOLBAR_HEIGHT - (keyboardVisible ? keyboardActualHeight : 0);
+
+  // Set bounds for only the active view
+  activeView.setBounds({
+    x: 0,
+    y: TOOLBAR_HEIGHT,
+    width: w,
+    height: availableHeight
+  });
+  console.log(`Optimized resize for '${currentView}': height=${availableHeight}`);
 }
 
 function updateKeyboardBounds() {
@@ -308,12 +338,14 @@ function applySettings() {
 function applyKeyboardStyle(style) {
   const keyboardWidth = style ? style.width : store.get('keyboard.width', 100);
   const keyHeight = style ? style.keyHeight : store.get('keyboard.keyHeight', 50);
+  const keyboardLayout = style ? style.layout : store.get('keyboard.layout', 'de');
 
   if (keyboardView && keyboardView.webContents) {
     const sendStyle = () => {
       keyboardView.webContents.send('update-keyboard-style', {
         width: keyboardWidth,
-        keyHeight: keyHeight
+        keyHeight: keyHeight,
+        layout: keyboardLayout
       });
     };
     if (keyboardView.webContents.isLoading()) {
@@ -436,6 +468,8 @@ function setupAutoKeyboard() {
 ipcMain.on('open-settings', () => {
   if (currentView !== 'settings') {
     previousView = currentView;
+    // Reload the settings page to ensure it has the latest data
+    settingsView.webContents.reload();
     showTab('settings');
     showKeyboardView();
     autoCloseEnabled = false; // Disable auto-close while in settings
@@ -625,6 +659,10 @@ ipcMain.handle('get-tabs', async () => {
   ]);
 });
 
+ipcMain.handle('get-current-view', () => {
+  return currentView;
+});
+
 ipcMain.on('close-settings', () => {
   // Restore original settings from store before closing, discarding any live changes
   applySettings();
@@ -650,7 +688,7 @@ ipcMain.on('keyboard-height-changed', (event, height) => {
       keyboardActualHeight = height;
       if (keyboardVisible) {
         updateKeyboardBounds();
-        showTab(currentView);
+        updateMainViewBounds(); // Optimized resize
       }
     }
   } else {
@@ -659,7 +697,7 @@ ipcMain.on('keyboard-height-changed', (event, height) => {
     keyboardActualHeight = 250;
     if (keyboardVisible) {
       updateKeyboardBounds();
-      showTab(currentView);
+      updateMainViewBounds(); // Optimized resize
     }
   }
 });
@@ -692,50 +730,52 @@ ipcMain.on('input-blurred', (event, viewName) => {
 
 // receive key presses from keyboard page (via preload -> ipc)
 ipcMain.on('webkeyboard-key', (ev, key) => {
-  const view = views[currentView];
-  if (!view || !view.webContents) return;
+  // Determine the target view for the keypress.
+  // This is crucial for making the keyboard work in the settings page.
+  const targetView = (currentView === 'settings') ? settingsView : views[currentView];
 
-  console.log('Mobile key pressed:', key, 'Shift active:', shiftActive);
+  if (!targetView || !targetView.webContents || targetView.webContents.isDestroyed()) {
+    console.error(`Cannot send key to invalid or destroyed view: ${currentView}`);
+    return;
+  }
+
+  console.log(`Sending key '${key}' to view '${currentView}'. Shift active: ${shiftActive}`);
 
   if (key === '{bksp}') {
-    view.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Backspace' });
-    view.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Backspace' });
+    targetView.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Backspace' });
+    targetView.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Backspace' });
   } else if (key === '{enter}') {
-    view.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Enter' });
-    view.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Enter' });
+    targetView.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Enter' });
+    targetView.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Enter' });
   } else if (key === '{space}' || key === ' ') {
-    view.webContents.sendInputEvent({ type: 'char', keyCode: ' ' });
+    targetView.webContents.sendInputEvent({ type: 'char', keyCode: ' ' });
   } else if (key === '{tab}') {
-    view.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Tab' });
-    view.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Tab' });
+    targetView.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Tab' });
+    targetView.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Tab' });
   } else if (key === '{shift}') {
-    // Mobile shift behavior - just toggle, keyboard handles the layout
+    // Shift behavior is handled by the keyboard view itself.
+    // We just note the status change.
     shiftActive = !shiftActive;
-    console.log('Mobile shift toggled to:', shiftActive);
+    console.log('Shift toggled to:', shiftActive);
   } else if (key === '{capslock}') {
     // CapsLock behavior
     shiftActive = !shiftActive;
-    console.log('Mobile CapsLock toggled to:', shiftActive);
+    console.log('CapsLock toggled to:', shiftActive);
   } else {
-    // Handle character input - mobile keyboard already sends correct case
+    // Handle character input. The keyboard view should provide the correct case.
     let charToSend = key;
     
-    // Mobile keyboard handles most case conversion, but handle special German characters
-  const specialChars = {
-    '\u00E4': '\u00E4',
-    '\u00F6': '\u00F6',
-    '\u00FC': '\u00FC',
-    '\u00DF': '\u00DF',
-    '\u00C4': '\u00C4',
-    '\u00D6': '\u00D6', 
-    '\u00DC': '\u00DC'  
-  };
+    // Handle special German characters just in case
+    const specialChars = {
+      '\u00E4': '\u00E4', '\u00F6': '\u00F6', '\u00FC': '\u00FC', '\u00DF': '\u00DF',
+      '\u00C4': '\u00C4', '\u00D6': '\u00D6', '\u00DC': '\u00DC'
+    };
     
     if (specialChars[key]) {
       charToSend = specialChars[key];
     }
     
-    view.webContents.sendInputEvent({ type: 'char', keyCode: charToSend });
+    targetView.webContents.sendInputEvent({ type: 'char', keyCode: charToSend });
   }
 });
 

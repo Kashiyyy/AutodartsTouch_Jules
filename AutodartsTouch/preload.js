@@ -2,7 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('api', {
   on: (channel, callback) => {
-    const validChannels = ['update-keyboard-style'];
+    const validChannels = ['update-keyboard-style', 'active-view-changed'];
     if (validChannels.includes(channel)) {
       ipcRenderer.on(channel, (event, ...args) => callback(...args));
     }
@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('api', {
   closePowerMenu: () => ipcRenderer.send('close-power-menu'),
   powerControl: (action) => ipcRenderer.send('power-control', action),
   getTabs: () => ipcRenderer.invoke('get-tabs'),
+  getCurrentView: () => ipcRenderer.invoke('get-current-view'),
   sendKey: (key) => ipcRenderer.send('webkeyboard-key', key),
   setShiftStatus: (isActive) => ipcRenderer.send('keyboard-shift-status', isActive),
   reportKeyboardHeight: (height) => ipcRenderer.send('keyboard-height-changed', height),

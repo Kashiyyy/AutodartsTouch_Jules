@@ -57,14 +57,16 @@ button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 a
 <script>
   let tabButtons = [];
 
-  function setActive(id) {
+  async function updateActiveTab() {
+    if (!window.api || !window.api.getCurrentView) return;
+    const activeViewId = await window.api.getCurrentView();
     tabButtons.forEach(t => {
-      t.setAttribute('aria-selected', t.id === id ? 'true' : 'false');
+      t.setAttribute('aria-selected', t.id === activeViewId ? 'true' : 'false');
     });
   }
 
   function switchTab(tabId) {
-    setActive(tabId);
+    // The UI will be updated via the 'active-view-changed' event from main.
     if (window.api && window.api.switchTab) {
       window.api.switchTab(tabId);
     }
@@ -88,15 +90,21 @@ button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 a
         }
       });
 
-      // Set the first tab as active by default
-      if (tabButtons.length > 0) {
-        setActive(tabButtons[0].id);
-      }
+      // Set the initial active tab based on the state from the main process.
+      updateActiveTab();
     }
   }
 
   document.addEventListener('DOMContentLoaded', () => {
     generateTabs();
+
+    // Listen for notifications from the main process to update the active tab.
+    if (window.api && window.api.on) {
+      window.api.on('active-view-changed', (activeViewId) => {
+        console.log(`Toolbar received active-view-changed event: ${activeViewId}`);
+        updateActiveTab();
+      });
+    }
 
     const webVKBtn = document.getElementById('webVKBtn');
     webVKBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); if (window.api && window.api.toggleWebKeyboard) window.api.toggleWebKeyboard(); });
