@@ -237,67 +237,68 @@
     async function loadLayout(layoutName) {
       const safeLayoutName = layoutName.replace(/[^a-zA-Z0-9_-]/g, '');
       if (!safeLayoutName) {
-        console.error('Invalid layout name provided.');
+        console.error('[KB_DEBUG] Invalid layout name provided.');
         return Promise.reject('Invalid layout name');
       }
 
       try {
+        console.log(`[KB_DEBUG] 6. Requesting layout data for '${safeLayoutName}'...`);
         const layoutData = await window.electronAPI.getKeyboardLayoutData(safeLayoutName);
         if (!layoutData) {
-          throw new Error(`No layout data returned for '${safeLayoutName}'`);
+          throw new Error(`No layout data returned for '${safeLayoutName}' from main process.`);
         }
+        console.log(`[KB_DEBUG] 7. Received layout data. Executing...`);
 
-        // Directly execute the script data using eval. This is more reliable for
-        // defining the global variables `keyboardLayouts` and `umlautMappings`.
         eval(layoutData);
+        console.log('[KB_DEBUG] 7a. eval() complete.');
 
         if (window.keyboardLayouts && window.umlautMappings) {
           layouts = window.keyboardLayouts;
           umlautMappings = window.umlautMappings;
-          console.log(`Layout '${safeLayoutName}' loaded and executed successfully via eval.`);
+          console.log(`[KB_DEBUG] 7b. Layout variables assigned successfully.`);
           return Promise.resolve();
         } else {
-          throw new Error(`Layout data for '${safeLayoutName}' did not define required variables.`);
+          throw new Error(`Layout data for '${safeLayoutName}' did not define window.keyboardLayouts or window.umlautMappings.`);
         }
       } catch (error) {
-        console.error(`Failed to load layout '${safeLayoutName}':`, error);
+        console.error(`[KB_DEBUG] Error in loadLayout for '${safeLayoutName}':`, error);
         return Promise.reject(error);
       }
     }
 
     function createKeyboard() {
+      console.log('[KB_DEBUG] 10. Inside createKeyboard()...');
       function renderKeyboard() {
+        console.log(`[KB_DEBUG] 11. Rendering keyboard for layout: '${currentLayout}'`);
         keyboardElement.innerHTML = '';
 
         let layout = layouts[currentLayout];
 
-        // If the desired layout (e.g., 'default' or 'shift') isn't found, fall back gracefully.
         if (!layout) {
-          console.warn(`Layout '${currentLayout}' not found. Attempting to find a fallback.`);
-          // Common layout names to try, in order of preference.
+          console.warn(`[KB_DEBUG] Layout '${currentLayout}' not found. Attempting to find a fallback.`);
           const fallbackKeys = ['default', 'normal'];
           for (const key of fallbackKeys) {
             if (layouts[key]) {
               layout = layouts[key];
-              console.log(`Using fallback layout: '${key}'`);
+              console.log(`[KB_DEBUG] Using fallback layout: '${key}'`);
               break;
             }
           }
-          // If no common fallback is found, use the first layout defined in the file.
           if (!layout) {
             const firstKey = Object.keys(layouts)[0];
             if (firstKey) {
               layout = layouts[firstKey];
-              console.log(`Using first available layout as fallback: '${firstKey}'`);
+              console.log(`[KB_DEBUG] Using first available layout as fallback: '${firstKey}'`);
             }
           }
         }
 
-        // If, after all fallbacks, no layout is available, we cannot render the keyboard.
         if (!layout) {
+          console.error('[KB_DEBUG] No valid keyboard layout found in the loaded data after fallbacks.');
           throw new Error("No valid keyboard layout found in the loaded data.");
         }
         
+        console.log(`[KB_DEBUG] 11a. Using layout with ${layout.length} rows.`);
         layout.forEach((row) => {
           const rowDiv = document.createElement('div');
           rowDiv.className = 'hg-row';
@@ -676,29 +677,38 @@
 
     // --- Initialization ---
     async function initializeKeyboard() {
+      console.log('[KB_DEBUG] 1. Starting keyboard initialization...');
       let layoutName = 'de'; // Default layout
       try {
+        console.log('[KB_DEBUG] 2. Fetching settings...');
         const settings = await window.electronAPI.getSettings();
+        console.log('[KB_DEBUG] 3. Settings fetched:', settings);
         if (settings && settings.keyboardLayout) {
           layoutName = settings.keyboardLayout;
+          console.log(`[KB_DEBUG] 4. Using layout from settings: '${layoutName}'`);
+        } else {
+          console.log(`[KB_DEBUG] 4. No layout in settings, using default: '${layoutName}'`);
         }
       } catch (e) {
-        console.error("Could not fetch settings, falling back to default layout.", e);
+        console.error("[KB_DEBUG] Error fetching settings, falling back to default layout.", e);
       }
 
       try {
-        // Try to load the desired layout.
+        console.log(`[KB_DEBUG] 5. Attempting to load layout: '${layoutName}'`);
         await loadLayout(layoutName);
+        console.log(`[KB_DEBUG] 8. Successfully loaded layout: '${layoutName}'`);
       } catch (error) {
         // If it fails, show a notification and try to load the default 'de' layout.
-        console.error(`Could not load layout '${layoutName}', falling back to 'de'.`, error);
+        console.error(`[KB_DEBUG] Error loading layout '${layoutName}', falling back to 'de'.`, error);
         showNotification(`Could not load layout '${layoutName}'. Using default.`);
 
         try {
+          console.log(`[KB_DEBUG] 5a. Attempting to load fallback layout: 'de'`);
           await loadLayout('de');
+          console.log(`[KB_DEBUG] 8a. Successfully loaded fallback layout: 'de'`);
         } catch (fallbackError) {
           // If the default layout ALSO fails, show a fatal error.
-          console.error("Fatal: Could not load the default 'de' layout. Keyboard will not function.", fallbackError);
+          console.error("[KB_DEBUG] FATAL: Could not load the default 'de' layout. Keyboard will not function.", fallbackError);
           showNotification("FATAL: Could not load default layout. Keyboard disabled.", true);
           return; // Stop execution.
         }
@@ -706,7 +716,9 @@
 
       // This code now only runs AFTER a layout has been successfully loaded.
       try {
+        console.log('[KB_DEBUG] 9. Creating keyboard instance...');
         const keyboardInstance = createKeyboard();
+        console.log('[KB_DEBUG] 12. Keyboard instance created successfully.');
 
         // Global functions for main process to call
         window.updateKeyboardLayout = () => {
@@ -726,7 +738,7 @@
         setTimeout(() => reportKeyboardHeight(), 100);
         window.addEventListener('resize', () => setTimeout(reportKeyboardHeight, 100));
       } catch (renderError) {
-        console.error("FATAL: Error rendering keyboard.", renderError);
+        console.error("[KB_DEBUG] FATAL: Error creating or rendering keyboard.", renderError);
         showNotification(`FATAL: Error rendering keyboard: ${renderError.message}`, true);
       }
     }
