@@ -226,6 +226,7 @@
   <script>
     let keyboardElement = document.getElementById('keyboard');
     let currentLayout = 'default';
+    let loadedLayoutName = 'de'; // To track the currently loaded layout file
     let shiftActive = false;
     let popupElement = null;
     let globalClickDisabled = false;
@@ -668,26 +669,25 @@
     // --- Initialization ---
     async function initializeKeyboard() {
       console.log('[KB_DEBUG] 1. Starting keyboard initialization...');
-      let layoutName = 'de'; // Default layout
       try {
         console.log('[KB_DEBUG] 2. Fetching settings...');
         const settings = await window.electronAPI.getSettings();
         console.log('[KB_DEBUG] 3. Settings fetched:', settings);
         if (settings && settings.keyboardLayout) {
-          layoutName = settings.keyboardLayout;
-          console.log(`[KB_DEBUG] 4. Using layout from settings: '${layoutName}'`);
+          loadedLayoutName = settings.keyboardLayout;
+          console.log(`[KB_DEBUG] 4. Using layout from settings: '${loadedLayoutName}'`);
         } else {
-          console.log(`[KB_DEBUG] 4. No layout in settings, using default: '${layoutName}'`);
+          console.log(`[KB_DEBUG] 4. No layout in settings, using default: '${loadedLayoutName}'`);
         }
       } catch (e) {
         console.error("[KB_DEBUG] Error fetching settings, falling back to default layout.", e);
       }
 
       try {
-        console.log(`[KB_DEBUG] 5. Attempting to load layout: '${layoutName}'`);
+        console.log(`[KB_DEBUG] 5. Attempting to load layout: '${loadedLayoutName}'`);
         // Convert to lowercase to ensure case-insensitive matching
-        await loadLayout(layoutName.toLowerCase());
-        console.log(`[KB_DEBUG] 8. Successfully loaded layout: '${layoutName}'`);
+        await loadLayout(loadedLayoutName.toLowerCase());
+        console.log(`[KB_DEBUG] 8. Successfully loaded layout: '${loadedLayoutName}'`);
       } catch (error) {
         // If it fails, show a notification and try to load the default 'de' layout.
         console.error(`[KB_DEBUG] Error loading layout '${layoutName}', falling back to 'de'.`, error);
@@ -743,7 +743,21 @@
   </script>
   <script>
       if (window.api) {
-        window.api.on('update-keyboard-style', (style) => {
+        window.api.on('update-keyboard-style', async (style) => {
+          // Check if the layout has changed
+          if (style.layout && style.layout.toLowerCase() !== loadedLayoutName.toLowerCase()) {
+            console.log(`[KB_DEBUG] Layout changed from '${loadedLayoutName}' to '${style.layout}'. Reloading...`);
+            try {
+              await loadLayout(style.layout.toLowerCase());
+              loadedLayoutName = style.layout; // Update the tracked layout name
+              resetKeyboardToDefault(); // Reset to default state
+              window.updateKeyboardLayout && window.updateKeyboardLayout(); // Re-render the keyboard
+            } catch (error) {
+              console.error(`Failed to apply new layout '${style.layout}':`, error);
+              showNotification(`Could not load layout: ${style.layout}`, true);
+            }
+          }
+
           const styleElement = document.getElementById('dynamic-keyboard-style') || document.createElement('style');
           styleElement.id = 'dynamic-keyboard-style';
           styleElement.innerHTML = `
