@@ -193,6 +193,30 @@ function showTab(tab) {
   if (keyboardVisible) updateKeyboardBounds();
 }
 
+function updateMainViewBounds() {
+  if (!mainWindow) return;
+  const [w, h] = mainWindow.getSize();
+
+  // Determine the active view
+  const activeView = (currentView === 'settings') ? settingsView : views[currentView];
+  if (!activeView || !activeView.webContents || activeView.webContents.isDestroyed()) {
+    console.error(`updateMainViewBounds: Cannot resize invalid or destroyed active view: ${currentView}`);
+    return;
+  }
+
+  // Calculate available height for content
+  const availableHeight = h - TOOLBAR_HEIGHT - (keyboardVisible ? keyboardActualHeight : 0);
+
+  // Set bounds for only the active view
+  activeView.setBounds({
+    x: 0,
+    y: TOOLBAR_HEIGHT,
+    width: w,
+    height: availableHeight
+  });
+  console.log(`Optimized resize for '${currentView}': height=${availableHeight}`);
+}
+
 function updateKeyboardBounds() {
   if (!mainWindow || !keyboardView) return;
   const [w, h] = mainWindow.getSize();
@@ -654,7 +678,7 @@ ipcMain.on('keyboard-height-changed', (event, height) => {
       keyboardActualHeight = height;
       if (keyboardVisible) {
         updateKeyboardBounds();
-        showTab(currentView);
+        updateMainViewBounds(); // Optimized resize
       }
     }
   } else {
@@ -663,7 +687,7 @@ ipcMain.on('keyboard-height-changed', (event, height) => {
     keyboardActualHeight = 250;
     if (keyboardVisible) {
       updateKeyboardBounds();
-      showTab(currentView);
+      updateMainViewBounds(); // Optimized resize
     }
   }
 });
