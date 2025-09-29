@@ -190,6 +190,12 @@ function showTab(tab) {
   }
 
   currentView = tab;
+
+  // Notify the toolbar that the active view has changed.
+  if (toolbarView && toolbarView.webContents && !toolbarView.webContents.isDestroyed()) {
+    toolbarView.webContents.send('active-view-changed', currentView);
+  }
+
   if (keyboardVisible) updateKeyboardBounds();
 }
 
@@ -651,6 +657,10 @@ ipcMain.handle('get-tabs', async () => {
     { name: 'Autodarts', url: 'https://play.autodarts.io/' },
     { name: 'Service', url: 'http://localhost:3180/' }
   ]);
+});
+
+ipcMain.handle('get-current-view', () => {
+  return currentView;
 });
 
 ipcMain.on('close-settings', () => {
