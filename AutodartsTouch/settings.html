@@ -194,11 +194,24 @@
       document.getElementById('tabUrl5'),
     ];
 
+    function throttle(callback, delay) {
+      let last = 0;
+      return function (...args) {
+        const now = new Date().getTime();
+        if (now - last < delay) {
+          return;
+        }
+        last = now;
+        callback(...args);
+      };
+    }
+
     function sendLiveUpdate() {
       if (window.electronAPI && window.electronAPI.updateKeyboardStyleLive) {
         const style = {
           width: keyboardWidthSlider.value,
           keyHeight: keyHeightSlider.value,
+          layout: keyboardLayoutSelect.value,
         };
         window.electronAPI.updateKeyboardStyleLive(style);
       }
@@ -239,8 +252,10 @@
     loadInitialData();
 
     // Add listeners for live-updates
-    keyboardWidthSlider.addEventListener('input', sendLiveUpdate);
-    keyHeightSlider.addEventListener('input', sendLiveUpdate);
+    const throttledSendLiveUpdate = throttle(sendLiveUpdate, 50);
+    keyboardWidthSlider.addEventListener('input', throttledSendLiveUpdate);
+    keyHeightSlider.addEventListener('input', throttledSendLiveUpdate);
+    keyboardLayoutSelect.addEventListener('change', sendLiveUpdate);
 
     saveBtn.addEventListener('click', () => {
       const tabs = [];

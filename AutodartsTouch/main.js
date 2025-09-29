@@ -308,12 +308,14 @@ function applySettings() {
 function applyKeyboardStyle(style) {
   const keyboardWidth = style ? style.width : store.get('keyboard.width', 100);
   const keyHeight = style ? style.keyHeight : store.get('keyboard.keyHeight', 50);
+  const keyboardLayout = style ? style.layout : store.get('keyboard.layout', 'de');
 
   if (keyboardView && keyboardView.webContents) {
     const sendStyle = () => {
       keyboardView.webContents.send('update-keyboard-style', {
         width: keyboardWidth,
-        keyHeight: keyHeight
+        keyHeight: keyHeight,
+        layout: keyboardLayout
       });
     };
     if (keyboardView.webContents.isLoading()) {
@@ -436,6 +438,8 @@ function setupAutoKeyboard() {
 ipcMain.on('open-settings', () => {
   if (currentView !== 'settings') {
     previousView = currentView;
+    // Reload the settings page to ensure it has the latest data
+    settingsView.webContents.reload();
     showTab('settings');
     showKeyboardView();
     autoCloseEnabled = false; // Disable auto-close while in settings
