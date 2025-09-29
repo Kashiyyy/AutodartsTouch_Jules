@@ -373,18 +373,22 @@ function setupAutoKeyboard() {
             // Method 1: ipcRenderer (if available)
             try {
               if (window.electronAPI) {
+                const viewName = '${viewName}';
+                console.log('[FOCUS_DEBUG] Renderer: Notifying main process of', eventType, 'for view', viewName);
                 if (eventType === 'focus') {
-                  window.electronAPI.inputFocused();
-                  console.log('? Sent via electronAPI.inputFocused');
+                  window.electronAPI.inputFocused(viewName);
+                  console.log('[FOCUS_DEBUG] Renderer: Sent inputFocused for', viewName);
                   return;
                 } else {
-                  window.electronAPI.inputBlurred();
-                  console.log('? Sent via electronAPI.inputBlurred');
+                  window.electronAPI.inputBlurred(viewName);
+                  console.log('[FOCUS_DEBUG] Renderer: Sent inputBlurred for', viewName);
                   return;
                 }
+              } else {
+                console.log('[FOCUS_DEBUG] Renderer: window.electronAPI not available.');
               }
             } catch (e) {
-              console.log('? electronAPI failed:', e);
+              console.log('[FOCUS_DEBUG] Renderer: Error calling electronAPI.', e);
             }
             
             // Method 2: Try to use postMessage
@@ -743,24 +747,37 @@ ipcMain.on('keyboard-height-changed', (event, height) => {
 });
 
 // Auto-focus keyboard handlers
-ipcMain.on('input-focused', () => {
-  console.log('Input focused - auto-showing keyboard');
-  if (!keyboardVisible) {
+ipcMain.on('input-focused', (event, viewName) => {
+  const view = views[viewName] || settingsView;
+  console.log(`[FOCUS_DEBUG] Main process received 'input-focused' from view: ${viewName}`);
+  console.log(`[FOCUS_DEBUG] Current active view is: ${currentView}`);
+  console.log(`[FOCUS_DEBUG] Keyboard visible: ${keyboardVisible}`);
+
+  if (view && !keyboardVisible) {
+    console.log('[FOCUS_DEBUG] Keyboard not visible, showing it now.');
     showKeyboardView();
+  } else {
+    console.log('[FOCUS_DEBUG] Keyboard already visible or view is invalid, not showing again.');
   }
 });
 
-ipcMain.on('input-blurred', () => {
-  console.log('Input blurred - auto-hiding keyboard');
-  // Auto-hide keyboard when input loses focus (if enabled)
+ipcMain.on('input-blurred', (event, viewName) => {
+  console.log(`[FOCUS_DEBUG] Main process received 'input-blurred' from view: ${viewName}`);
+  console.log(`[FOCUS_DEBUG] Current active view is: ${currentView}`);
+  console.log(`[FOCUS_DEBUG] autoCloseEnabled: ${autoCloseEnabled}`);
+
   if (keyboardVisible && autoCloseEnabled) {
+    console.log('[FOCUS_DEBUG] Keyboard is visible and auto-close is enabled. Hiding keyboard after delay.');
     setTimeout(() => {
-      // Double-check if keyboard is still visible and no manual toggle happened
       if (keyboardVisible && autoCloseEnabled) {
-        console.log('Auto-hiding keyboard after input blur');
+        console.log('[FOCUS_DEBUG] Auto-hiding keyboard now.');
         hideKeyboardView();
+      } else {
+        console.log('[FOCUS_DEBUG] Conditions for auto-hiding no longer met.');
       }
-    }, 300); // Small delay to prevent flicker when switching between inputs
+    }, 300);
+  } else {
+    console.log('[FOCUS_DEBUG] Keyboard not visible or auto-close is disabled. Not hiding.');
   }
 });
 
