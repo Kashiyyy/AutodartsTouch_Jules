@@ -146,6 +146,16 @@ button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 a
             window.api.openPowerMenu();
         }
     });
+
+    // Handle cursor visibility based on input type
+    document.addEventListener('pointerdown', (e) => {
+      // 'mouse' pointerType indicates a real mouse was used.
+      // Any other type (like 'touch' or 'pen') means we should hide the cursor.
+      const isMouse = e.pointerType === 'mouse';
+      if (window.api && window.api.setCursorVisibility) {
+        window.api.setCursorVisibility(isMouse);
+      }
+    }, { capture: true });
   });
 
 </script>

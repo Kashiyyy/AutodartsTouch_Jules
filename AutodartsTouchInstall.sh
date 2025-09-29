@@ -132,24 +132,40 @@ fi
 
 # --- Step 5: Download Autodarts Touch Application
 print_header "Step 5: Downloading Autodarts Touch Files"
+# Clean up old directory
 rm -rf "$APP_DIR"
 
-print_info "Cloning repository from $GITHUB_REPO_URL..."
+print_info "Cloning repository to a temporary directory..."
 TMP_DIR=$(mktemp -d)
-if ! git clone --depth 1 --branch "$BRANCH_NAME" "$GITHUB_REPO_URL" "$TMP_DIR"; then
+# The repo name is derived from the URL, e.g., "AutodartsTouch_Jules"
+REPO_NAME=$(basename "$GITHUB_REPO_URL" .git)
+CLONE_DIR="$TMP_DIR/$REPO_NAME"
+
+if ! git clone --depth 1 --branch "$BRANCH_NAME" "$GITHUB_REPO_URL" "$CLONE_DIR"; then
   print_error "Failed to clone the repository. Please check the URL and your connection."
 fi
 
-# The application files are in the 'AutodartsTouch' subdirectory of the repository.
-# We move this subdirectory to the final destination.
-mv "$TMP_DIR/AutodartsTouch" "$APP_DIR"
+# The application files are in the 'AutodartsTouch' subdirectory.
+SOURCE_SUBDIR="$CLONE_DIR/AutodartsTouch"
 
-# Clean up the temporary directory.
+# Check if the source subdirectory exists
+if [ ! -d "$SOURCE_SUBDIR" ]; then
+    print_error "The 'AutodartsTouch' subdirectory was not found in the repository."
+fi
+
+# Move the entire application subdirectory to the final destination
+print_info "Moving application files to $APP_DIR..."
+if ! mv "$SOURCE_SUBDIR" "$APP_DIR"; then
+    print_error "Failed to move application files."
+fi
+
+# Clean up the temporary directory
 rm -rf "$TMP_DIR"
 
+# Set ownership and permissions now that all files are in place
 chown -R "$GUI_USER:$GUI_USER" "$APP_DIR"
 chmod +x "$START_SCRIPT"
-print_success "Application files downloaded."
+print_success "Application files downloaded successfully to $APP_DIR."
 
 
 # --- Step 6: Install Node.js Dependencies
