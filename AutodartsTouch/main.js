@@ -609,20 +609,31 @@ ipcMain.handle('get-keyboard-layouts', async () => {
 });
 
 ipcMain.handle('get-keyboard-layout-data', async (event, layoutName) => {
-  // Convert to lowercase for case-insensitive file systems and consistency.
-  const safeLayoutName = (layoutName || '').toLowerCase().replace(/[^a-z0-9_-]/g, '');
-  if (!safeLayoutName) {
+  const requestedLayout = (layoutName || '').toLowerCase();
+  if (!requestedLayout) {
     console.error('Request for invalid or empty layout name rejected.');
     return null;
   }
 
-  // This is the direct and most reliable path to the resource inside the application.
-  const layoutPath = path.join(__dirname, 'keyboard', 'layouts', `${safeLayoutName}.js`);
+  const layoutDir = path.join(__dirname, 'keyboard', 'layouts');
+
   try {
+    const files = await fs.promises.readdir(layoutDir);
+    // Perform a case-insensitive search for the file.
+    const targetFile = files.find(file =>
+      path.basename(file, '.js').toLowerCase() === requestedLayout
+    );
+
+    if (!targetFile) {
+      console.error(`Layout file not found for '${layoutName}' in directory ${layoutDir}`);
+      return null;
+    }
+
+    const layoutPath = path.join(layoutDir, targetFile);
     console.log(`Reading layout file from: ${layoutPath}`);
     return await fs.promises.readFile(layoutPath, 'utf-8');
   } catch (error) {
-    console.error(`FATAL: Could not read layout file from ${layoutPath}.`, error);
+    console.error(`FATAL: Could not read layouts directory at ${layoutDir}.`, error);
     return null;
   }
 });
