@@ -350,7 +350,7 @@ function injectFocusDetector(view, viewName) {
         }
 
         function notifyMainProcess(eventType) {
-          console.log('[FOCUS_DEBUG] Renderer: Notifying main of "${eventType}" for view "${viewName}".');
+          console.log('[FOCUS_DEBUG] Renderer: Notifying main of "' + eventType + '" for view "' + '${viewName}' + '".');
           if (window.electronAPI && typeof window.electronAPI.inputFocused === 'function') {
             if (eventType === 'focus') {
               window.electronAPI.inputFocused('${viewName}');
@@ -389,9 +389,9 @@ function injectFocusDetector(view, viewName) {
   `;
 
   const doInjection = () => {
-      console.log(\`[Debug] Attempting to inject focus script into ${viewName}.\`);
+      console.log(`[Debug] Attempting to inject focus script into ${viewName}.`);
       view.webContents.executeJavaScript(script).catch(err => {
-          console.error(\`[Debug] FAILED to inject focus script into ${viewName}:\`, err);
+          console.error(`[Debug] FAILED to inject focus script into ${viewName}:`, err);
       });
   };
 
@@ -411,7 +411,7 @@ function setupAutoKeyboard() {
 
   Object.entries(allViews).forEach(([viewName, view]) => {
       if (!view || view.webContents.isDestroyed()) {
-          console.log(\`[Debug] Skipping setup for invalid or destroyed view: ${viewName}\`);
+          console.log(`[Debug] Skipping setup for invalid or destroyed view: ${viewName}`);
           return;
       }
 
@@ -420,10 +420,10 @@ function setupAutoKeyboard() {
       // Keep console message listener as a fallback, though it's not the primary method.
       view.webContents.on('console-message', (event, level, message) => {
           if (message.includes('KEYBOARD_EVENT:focus:')) {
-              console.log(\`?? Detected input focus via CONSOLE message from ${viewName}\`);
+              console.log(`?? Detected input focus via CONSOLE message from ${viewName}`);
               showKeyboardView();
           } else if (message.includes('KEYBOARD_EVENT:blur:')) {
-              console.log(\`?? Detected input blur via CONSOLE message from ${viewName}\`);
+              console.log(`?? Detected input blur via CONSOLE message from ${viewName}`);
               if (keyboardVisible && autoCloseEnabled) {
                   hideKeyboardView();
               }
