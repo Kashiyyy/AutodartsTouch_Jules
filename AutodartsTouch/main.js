@@ -38,7 +38,7 @@ async function createWindow() {
   });
 
   // Create static views that are never reloaded
-  settingsView = new BrowserView({ webPreferences: { sandbox: false, preload: path.join(__dirname, 'preload.js') } });
+  settingsView = new BrowserView({ webPreferences: { contextIsolation: true, sandbox: false, preload: path.join(__dirname, 'preload.js') } });
   mainWindow.addBrowserView(settingsView);
   settingsView.webContents.loadFile(path.join(__dirname, 'settings.html'));
 
@@ -70,7 +70,7 @@ function createDynamicViews() {
   ]);
   tabs.forEach((tab, index) => {
     if (tab && tab.url && tab.url.trim() !== '') {
-      const view = new BrowserView({ webPreferences: { sandbox: false, preload: path.join(__dirname, 'preload.js') } });
+      const view = new BrowserView({ webPreferences: { contextIsolation: true, sandbox: false, preload: path.join(__dirname, 'preload.js') } });
       mainWindow.addBrowserView(view);
       views[`tab${index}`] = view;
       loadingPromises.push(view.webContents.loadURL(tab.url).catch(e => console.error(`tab${index} load error:`, e)));
