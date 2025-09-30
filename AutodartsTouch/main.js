@@ -397,12 +397,13 @@ function setupAutoKeyboard() {
   });
 }
 
+// This is the main entry point.
 app.whenReady().then(async () => {
   // Initialize paths now that app is ready
   EXTENSION_DIR = path.join(app.getPath('userData'), 'Extension');
   log.transports.file.resolvePathFn(() => path.join(app.getPath('userData'), 'logs', 'main.log'));
 
-  // IPC Handlers that depend on app paths
+  // Register IPC Handlers that depend on app paths
   ipcMain.handle('getExtensionVersions', async () => {
     log.info('IPC: getExtensionVersions called.');
     try {
@@ -452,6 +453,7 @@ app.whenReady().then(async () => {
     shell.showItemInFolder(logFilePath);
   });
 
+  // Load extension on startup if enabled
   const enableExtension = store.get('enableExtension', false);
   if (enableExtension && fs.existsSync(EXTENSION_DIR)) {
     try {
@@ -462,6 +464,7 @@ app.whenReady().then(async () => {
       log.error('Failed to load Autodarts Tools extension on startup:', error);
     }
   }
+
   createWindow();
 });
 
