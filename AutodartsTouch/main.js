@@ -401,7 +401,13 @@ function setupAutoKeyboard() {
 app.whenReady().then(async () => {
   // Initialize paths now that app is ready
   EXTENSION_DIR = path.join(app.getPath('userData'), 'Extension');
-  log.transports.file.resolvePathFn(() => path.join(app.getPath('userData'), 'logs', 'main.log'));
+  log.transports.file.resolvePath = (vars) => {
+    const logPath = store.get('logPath');
+    if (logPath) {
+      return path.join(logPath, vars.fileName);
+    }
+    return path.join(app.getPath('userData'), 'logs', vars.fileName);
+  };
 
   // Register IPC Handlers that depend on app paths
   ipcMain.handle('getExtensionVersions', async () => {
