@@ -36,5 +36,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getSettings: () => ipcRenderer.invoke('get-settings'),
   saveSettings: (settings) => ipcRenderer.send('save-settings', settings),
   closeSettings: () => ipcRenderer.send('close-settings'),
-  updateKeyboardStyleLive: (style) => ipcRenderer.send('update-keyboard-style-live', style)
+  updateKeyboardStyleLive: (style) => ipcRenderer.send('update-keyboard-style-live', style),
+
+  // Extension Management API
+  getExtensionVersions: () => ipcRenderer.invoke('getExtensionVersions'),
+  downloadExtension: () => ipcRenderer.invoke('downloadExtension'),
+  openLogFile: () => ipcRenderer.send('open-log-file'),
 });
