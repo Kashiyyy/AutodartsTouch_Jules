@@ -23,15 +23,25 @@ let autodartsToolsExtensionId = null;
 const GITHUB_REPO = 'creazy231/tools-for-autodarts';
 const EXTENSION_DIR = path.join(__dirname, 'Extension');
 
-// Helper function to get the latest release version from GitHub
-async function getLatestExtensionVersion() {
+// Helper function to get latest release info (version and download URL)
+async function getLatestExtensionInfo() {
   try {
     const response = await axios.get(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`);
-    const latestVersion = response.data.tag_name;
-    log.info(`Latest extension version found: ${latestVersion}`);
-    return semver.clean(latestVersion);
+    const latestVersion = semver.clean(response.data.tag_name);
+    const chromeAsset = response.data.assets.find(asset => asset.name.endsWith('-chrome.zip'));
+
+    if (!chromeAsset) {
+      log.error('Could not find Chrome asset in the latest release.');
+      return null;
+    }
+
+    log.info(`Latest extension version found: ${latestVersion} with URL: ${chromeAsset.browser_download_url}`);
+    return {
+      version: latestVersion,
+      url: chromeAsset.browser_download_url,
+    };
   } catch (error) {
-    log.error('Failed to fetch latest extension version:', error.message);
+    log.error('Failed to fetch latest extension info:', error.message);
     return null;
   }
 }
@@ -54,9 +64,8 @@ function getInstalledExtensionVersion() {
 }
 
 // Helper function to download and extract the extension
-async function downloadAndInstallExtension(version) {
-  const url = `https://github.com/${GITHUB_REPO}/releases/download/${version}/tools-for-autodarts-chrome.zip`;
-  log.info(`Downloading extension from: ${url}`);
+async function downloadAndInstallExtension(url, version) {
+  log.info(`Downloading extension version ${version} from: ${url}`);
 
   try {
     // Ensure the extension directory exists and is empty
@@ -603,17 +612,19 @@ ipcMain.on('close-power-menu', () => {
     }
 });
 
+
 ipcMain.handle('getExtensionVersions', async () => {
   const installed = getInstalledExtensionVersion();
-  const latest = await getLatestExtensionVersion();
+  const latestInfo = await getLatestExtensionInfo();
+  const latest = latestInfo ? latestInfo.version : null;
   const isUpdateAvailable = installed && latest ? semver.gt(latest, installed) : false;
   return { installed, latest, isUpdateAvailable };
 });
 
 ipcMain.handle('downloadExtension', async () => {
-  const latestVersion = await getLatestExtensionVersion();
-  if (latestVersion) {
-    return await downloadAndInstallExtension(latestVersion);
+  const latestInfo = await getLatestExtensionInfo();
+  if (latestInfo) {
+    return await downloadAndInstallExtension(latestInfo.url, latestInfo.version);
   }
   return false;
 });
