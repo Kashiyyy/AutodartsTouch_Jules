@@ -397,7 +397,75 @@ function setupAutoKeyboard() {
   });
 }
 
-// IPC Handlers
+app.whenReady().then(async () => {
+  // Initialize paths now that app is ready
+  EXTENSION_DIR = path.join(app.getPath('userData'), 'Extension');
+  log.transports.file.resolvePathFn(() => path.join(app.getPath('userData'), 'logs', 'main.log'));
+
+  // IPC Handlers that depend on app paths
+  ipcMain.handle('getExtensionVersions', async () => {
+    log.info('IPC: getExtensionVersions called.');
+    try {
+      const installed = getInstalledExtensionVersion();
+      const latestInfo = await getLatestExtensionInfo();
+      if (!latestInfo) return { error: 'Could not fetch latest version info from GitHub.' };
+      const latest = latestInfo.version;
+      const isUpdateAvailable = installed && latest ? semver.gt(latest, installed) : false;
+      log.info(`IPC: getExtensionVersions returning: installed=${installed}, latest=${latest}, updateAvailable=${isUpdateAvailable}`);
+      return { installed, latest, isUpdateAvailable };
+    } catch (error) {
+      log.error('IPC: getExtensionVersions error:', error);
+      return { error: error.message };
+    }
+  });
+
+  ipcMain.handle('downloadExtension', async () => {
+    log.info('IPC: downloadExtension called.');
+    const latestInfo = await getLatestExtensionInfo();
+    if (latestInfo && latestInfo.url && latestInfo.version) {
+      const success = await downloadAndInstallExtension(latestInfo.url, latestInfo.version);
+      if (success) {
+        if (autodartsToolsExtensionId) {
+          await session.defaultSession.removeExtension(autodartsToolsExtensionId);
+          log.info('Removed old extension version to prepare for reload.');
+          autodartsToolsExtensionId = null;
+        }
+        if (store.get('enableExtension', false)) {
+          try {
+            const extension = await session.defaultSession.loadExtension(EXTENSION_DIR, { allowFileAccess: true });
+            autodartsToolsExtensionId = extension.id;
+            log.info('Successfully reloaded extension after download/update.');
+          } catch (error) {
+            log.error('Failed to reload extension after download/update:', error);
+          }
+        }
+      }
+      return { success };
+    }
+    log.error('IPC: downloadExtension failed because latest info was not available.');
+    return { success: false, error: 'Could not get latest release information.' };
+  });
+
+  ipcMain.on('open-log-file', () => {
+    const logFilePath = log.transports.file.getFile().path;
+    log.info(`IPC: open-log-file called. Opening: ${logFilePath}`);
+    shell.showItemInFolder(logFilePath);
+  });
+
+  const enableExtension = store.get('enableExtension', false);
+  if (enableExtension && fs.existsSync(EXTENSION_DIR)) {
+    try {
+      const extension = await session.defaultSession.loadExtension(EXTENSION_DIR, { allowFileAccess: true });
+      autodartsToolsExtensionId = extension.id;
+      log.info('Autodarts Tools extension loaded successfully on startup.');
+    } catch (error) {
+      log.error('Failed to load Autodarts Tools extension on startup:', error);
+    }
+  }
+  createWindow();
+});
+
+// Other IPC Handlers
 ipcMain.on('open-settings', () => {
   if (currentView !== 'settings') {
     previousView = currentView;
@@ -450,55 +518,6 @@ ipcMain.on('close-power-menu', () => {
     const [w, h] = mainWindow.getSize();
     powerMenuView.setBounds({ x: 0, y: h, width: w, height: h });
   }
-});
-
-ipcMain.handle('getExtensionVersions', async () => {
-  log.info('IPC: getExtensionVersions called.');
-  try {
-    const installed = getInstalledExtensionVersion();
-    const latestInfo = await getLatestExtensionInfo();
-    if (!latestInfo) return { error: 'Could not fetch latest version info from GitHub.' };
-    const latest = latestInfo.version;
-    const isUpdateAvailable = installed && latest ? semver.gt(latest, installed) : false;
-    log.info(`IPC: getExtensionVersions returning: installed=${installed}, latest=${latest}, updateAvailable=${isUpdateAvailable}`);
-    return { installed, latest, isUpdateAvailable };
-  } catch (error) {
-    log.error('IPC: getExtensionVersions error:', error);
-    return { error: error.message };
-  }
-});
-
-ipcMain.handle('downloadExtension', async () => {
-  log.info('IPC: downloadExtension called.');
-  const latestInfo = await getLatestExtensionInfo();
-  if (latestInfo && latestInfo.url && latestInfo.version) {
-    const success = await downloadAndInstallExtension(latestInfo.url, latestInfo.version);
-    if (success) {
-      if (autodartsToolsExtensionId) {
-        await session.defaultSession.removeExtension(autodartsToolsExtensionId);
-        log.info('Removed old extension version to prepare for reload.');
-        autodartsToolsExtensionId = null;
-      }
-      if (store.get('enableExtension', false)) {
-        try {
-          const extension = await session.defaultSession.loadExtension(EXTENSION_DIR, { allowFileAccess: true });
-          autodartsToolsExtensionId = extension.id;
-          log.info('Successfully reloaded extension after download/update.');
-        } catch (error) {
-          log.error('Failed to reload extension after download/update:', error);
-        }
-      }
-    }
-    return { success };
-  }
-  log.error('IPC: downloadExtension failed because latest info was not available.');
-  return { success: false, error: 'Could not get latest release information.' };
-});
-
-ipcMain.on('open-log-file', () => {
-  const logFilePath = log.transports.file.getFile().path;
-  log.info(`IPC: open-log-file called. Opening: ${logFilePath}`);
-  shell.showItemInFolder(logFilePath);
 });
 
 ipcMain.on('power-control', (event, action) => {
@@ -677,24 +696,6 @@ ipcMain.on('webkeyboard-key', (ev, key) => {
 
 ipcMain.on('keyboard-shift-status', (ev, isActive) => {
   shiftActive = isActive;
-});
-
-app.whenReady().then(async () => {
-  // Initialize paths now that app is ready
-  EXTENSION_DIR = path.join(app.getPath('userData'), 'Extension');
-  log.transports.file.resolvePathFn(() => path.join(app.getPath('userData'), 'logs', 'main.log'));
-
-  const enableExtension = store.get('enableExtension', false);
-  if (enableExtension && fs.existsSync(EXTENSION_DIR)) {
-    try {
-      const extension = await session.defaultSession.loadExtension(EXTENSION_DIR, { allowFileAccess: true });
-      autodartsToolsExtensionId = extension.id;
-      log.info('Autodarts Tools extension loaded successfully on startup.');
-    } catch (error) {
-      log.error('Failed to load Autodarts Tools extension on startup:', error);
-    }
-  }
-  createWindow();
 });
 
 app.on('window-all-closed', () => app.quit());
