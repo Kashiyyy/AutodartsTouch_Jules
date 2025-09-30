@@ -65,6 +65,33 @@
     #saveBtn { background-color: #0066cc; }
     #saveBtn:hover { background-color: #0077dd; }
 
+    .extension-settings {
+        background-color: rgba(0, 0, 0, 0.2);
+        padding: 15px;
+        border-radius: 8px;
+        margin-top: 20px;
+    }
+    #extension-status p {
+        margin: 8px 0;
+    }
+    #extension-status button {
+        margin-top: 10px;
+        padding: 10px 20px;
+        font-size: 16px;
+    }
+    #update-extension-btn {
+        background-color: #f0ad4e;
+    }
+    #update-extension-btn:hover {
+        background-color: #ec971f;
+    }
+     #download-extension-btn {
+        background-color: #5cb85c;
+    }
+    #download-extension-btn:hover {
+        background-color: #4cae4c;
+    }
+
     /* Toggle switch styles */
     .switch {
       position: relative;
@@ -115,14 +142,6 @@
     </div>
 
     <div class="setting">
-      <label for="enableExtension" style="display: inline-block;">Enable Autodarts Tools Extension</label>
-      <label class="switch">
-        <input type="checkbox" id="enableExtension">
-        <span class="slider"></span>
-      </label>
-    </div>
-
-    <div class="setting">
       <label for="keyboardWidth">Keyboard Width (%)</label>
       <input type="range" id="keyboardWidth" min="50" max="100" value="100">
     </div>
@@ -135,6 +154,23 @@
     <div class="setting">
       <label for="keyboardLayout">Keyboard Layout</label>
       <select id="keyboardLayout"></select>
+    </div>
+
+    <div class="extension-settings">
+        <h2>Autodarts Tools Extension</h2>
+        <div class="setting">
+            <label for="enableExtension" style="display: inline-block;">Enable Extension</label>
+            <label class="switch">
+                <input type="checkbox" id="enableExtension">
+                <span class="slider"></span>
+            </label>
+        </div>
+        <div id="extension-status" style="display: none;">
+            <p>Installed Version: <span id="installed-version">Not installed</span></p>
+            <p>Latest Version: <span id="latest-version">Checking...</span></p>
+            <button id="update-extension-btn" style="display: none;">Update Available</button>
+            <button id="download-extension-btn" style="display: none;">Download & Install</button>
+        </div>
     </div>
 
     <div class="tabs-settings">
@@ -222,9 +258,16 @@
     const keyboardWidthSlider = document.getElementById('keyboardWidth');
     const keyHeightSlider = document.getElementById('keyHeight');
     const keyboardLayoutSelect = document.getElementById('keyboardLayout');
-    const enableExtensionCheckbox = document.getElementById('enableExtension');
     const saveBtn = document.getElementById('saveBtn');
     const closeBtn = document.getElementById('closeBtn');
+
+    // Extension settings elements
+    const enableExtensionCheckbox = document.getElementById('enableExtension');
+    const extensionStatusDiv = document.getElementById('extension-status');
+    const installedVersionSpan = document.getElementById('installed-version');
+    const latestVersionSpan = document.getElementById('latest-version');
+    const updateExtensionBtn = document.getElementById('update-extension-btn');
+    const downloadExtensionBtn = document.getElementById('download-extension-btn');
 
     const tabNameInputs = [
       document.getElementById('tabName1'),
@@ -253,6 +296,26 @@
       }
     }
 
+    async function updateExtensionStatus() {
+      if (!window.electronAPI || !window.electronAPI.getExtensionVersions) return;
+
+      const versions = await window.electronAPI.getExtensionVersions();
+      installedVersionSpan.textContent = versions.installed || 'Not installed';
+      latestVersionSpan.textContent = versions.latest || 'Could not fetch';
+
+      downloadExtensionBtn.style.display = 'none';
+      updateExtensionBtn.style.display = 'none';
+
+      if (versions.latest) {
+        if (!versions.installed) {
+          downloadExtensionBtn.style.display = 'block';
+        } else if (versions.installed && versions.latest && versions.isUpdateAvailable) {
+          updateExtensionBtn.textContent = `Update to ${versions.latest}`;
+          updateExtensionBtn.style.display = 'block';
+        }
+      }
+    }
+
     async function loadInitialData() {
       if (!window.electronAPI) return;
 
@@ -271,16 +334,23 @@
       if (window.electronAPI.getSettings) {
         const settings = await window.electronAPI.getSettings();
         if (settings) {
-          if (settings.volume) volumeSlider.value = settings.volume;
-          if (settings.keyboardWidth) keyboardWidthSlider.value = settings.keyboardWidth;
-          if (settings.keyHeight) keyHeightSlider.value = settings.keyHeight;
-          if (settings.keyboardLayout) keyboardLayoutSelect.value = settings.keyboardLayout;
-          if (settings.enableExtension) enableExtensionCheckbox.checked = settings.enableExtension;
+          volumeSlider.value = settings.volume || 50;
+          keyboardWidthSlider.value = settings.keyboardWidth || 100;
+          keyHeightSlider.value = settings.keyHeight || 50;
+          keyboardLayoutSelect.value = settings.keyboardLayout || 'de';
           if (settings.tabs) {
             settings.tabs.forEach((tab, index) => {
               if (tabNameInputs[index]) tabNameInputs[index].value = tab.name;
               if (tabUrlInputs[index]) tabUrlInputs[index].value = tab.url;
             });
+          }
+          if (settings.enableExtension) {
+            enableExtensionCheckbox.checked = true;
+            extensionStatusDiv.style.display = 'block';
+            updateExtensionStatus();
+          } else {
+            enableExtensionCheckbox.checked = false;
+            extensionStatusDiv.style.display = 'none';
           }
         }
       }
@@ -292,6 +362,44 @@
     keyboardWidthSlider.addEventListener('change', sendLiveUpdate);
     keyHeightSlider.addEventListener('change', sendLiveUpdate);
     keyboardLayoutSelect.addEventListener('change', sendLiveUpdate);
+
+    enableExtensionCheckbox.addEventListener('change', () => {
+      const isEnabled = enableExtensionCheckbox.checked;
+      extensionStatusDiv.style.display = isEnabled ? 'block' : 'none';
+      if (isEnabled) {
+        updateExtensionStatus();
+      }
+    });
+
+    downloadExtensionBtn.addEventListener('click', async () => {
+      if (window.electronAPI && window.electronAPI.downloadExtension) {
+        downloadExtensionBtn.textContent = 'Downloading...';
+        downloadExtensionBtn.disabled = true;
+        const success = await window.electronAPI.downloadExtension();
+        if (success) {
+          downloadExtensionBtn.textContent = 'Downloaded!';
+          setTimeout(updateExtensionStatus, 1000);
+        } else {
+          downloadExtensionBtn.textContent = 'Download Failed';
+          downloadExtensionBtn.disabled = false;
+        }
+      }
+    });
+
+    updateExtensionBtn.addEventListener('click', async () => {
+      if (window.electronAPI && window.electronAPI.downloadExtension) {
+        updateExtensionBtn.textContent = 'Updating...';
+        updateExtensionBtn.disabled = true;
+        const success = await window.electronAPI.downloadExtension();
+        if (success) {
+          updateExtensionBtn.textContent = 'Updated!';
+          setTimeout(updateExtensionStatus, 1000);
+        } else {
+          updateExtensionBtn.textContent = 'Update Failed';
+          updateExtensionBtn.disabled = false;
+        }
+      }
+    });
 
     saveBtn.addEventListener('click', () => {
       const tabs = [];

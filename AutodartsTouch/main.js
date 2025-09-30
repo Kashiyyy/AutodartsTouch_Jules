@@ -3,6 +3,10 @@ const path = require('path');
 const fs = require('fs');
 const Store = require('electron-store');
 const { exec } = require('child_process');
+const axios = require('axios');
+const unzipper = require('unzipper');
+const semver = require('semver');
+const log = require('electron-log');
 
 const store = new Store();
 
@@ -15,6 +19,76 @@ let powerMenuView;
 let currentView = 'tab0'; // Default to the first tab
 let previousView = null;
 let autodartsToolsExtensionId = null;
+
+const GITHUB_REPO = 'creazy231/tools-for-autodarts';
+const EXTENSION_DIR = path.join(__dirname, 'Extension');
+
+// Helper function to get the latest release version from GitHub
+async function getLatestExtensionVersion() {
+  try {
+    const response = await axios.get(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`);
+    const latestVersion = response.data.tag_name;
+    log.info(`Latest extension version found: ${latestVersion}`);
+    return semver.clean(latestVersion);
+  } catch (error) {
+    log.error('Failed to fetch latest extension version:', error.message);
+    return null;
+  }
+}
+
+// Helper function to get the currently installed version from manifest.json
+function getInstalledExtensionVersion() {
+  const manifestPath = path.join(EXTENSION_DIR, 'manifest.json');
+  if (fs.existsSync(manifestPath)) {
+    try {
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+      const installedVersion = manifest.version;
+      log.info(`Found installed extension version: ${installedVersion}`);
+      return semver.clean(installedVersion);
+    } catch (error) {
+      log.error('Failed to read or parse installed extension manifest:', error.message);
+      return null;
+    }
+  }
+  return null;
+}
+
+// Helper function to download and extract the extension
+async function downloadAndInstallExtension(version) {
+  const url = `https://github.com/${GITHUB_REPO}/releases/download/${version}/tools-for-autodarts-chrome.zip`;
+  log.info(`Downloading extension from: ${url}`);
+
+  try {
+    // Ensure the extension directory exists and is empty
+    if (fs.existsSync(EXTENSION_DIR)) {
+      fs.rmSync(EXTENSION_DIR, { recursive: true, force: true });
+    }
+    fs.mkdirSync(EXTENSION_DIR);
+
+    const response = await axios({
+      url,
+      method: 'GET',
+      responseType: 'stream'
+    });
+
+    const extraction = response.data.pipe(unzipper.Extract({ path: EXTENSION_DIR }));
+
+    await new Promise((resolve, reject) => {
+      extraction.on('finish', resolve);
+      extraction.on('error', reject);
+    });
+
+    log.info(`Extension version ${version} downloaded and extracted successfully.`);
+    return true;
+  } catch (error) {
+    log.error(`Failed to download or extract extension: ${error.message}`);
+    // Clean up failed download
+    if (fs.existsSync(EXTENSION_DIR)) {
+      fs.rmSync(EXTENSION_DIR, { recursive: true, force: true });
+    }
+    return false;
+  }
+}
 
 const TOOLBAR_HEIGHT = 72;
 const KEYBOARD_HEIGHT = 300;
@@ -529,6 +603,21 @@ ipcMain.on('close-power-menu', () => {
     }
 });
 
+ipcMain.handle('getExtensionVersions', async () => {
+  const installed = getInstalledExtensionVersion();
+  const latest = await getLatestExtensionVersion();
+  const isUpdateAvailable = installed && latest ? semver.gt(latest, installed) : false;
+  return { installed, latest, isUpdateAvailable };
+});
+
+ipcMain.handle('downloadExtension', async () => {
+  const latestVersion = await getLatestExtensionVersion();
+  if (latestVersion) {
+    return await downloadAndInstallExtension(latestVersion);
+  }
+  return false;
+});
+
 ipcMain.on('power-control', (event, action) => {
   // Add a layer of security/confirmation if needed in a real-world scenario
   switch (action) {
@@ -604,7 +693,7 @@ ipcMain.handle('get-settings', async () => {
     keyboardWidth: store.get('keyboard.width', 100),
     keyHeight: store.get('keyboard.keyHeight', 50),
     keyboardLayout: store.get('keyboard.layout', 'de'),
-    enableExtension: store.get('enableExtension', true),
+    enableExtension: store.get('enableExtension', false),
     tabs: store.get('tabs', [
       { name: 'Autodarts', url: 'https://play.autodarts.io/' },
       { name: 'Service', url: 'http://localhost:3180/' }
@@ -613,8 +702,8 @@ ipcMain.handle('get-settings', async () => {
 });
 
 ipcMain.on('save-settings', async (event, settings) => {
-  console.log('Saving settings...');
-  const oldEnableExtension = store.get('enableExtension', true);
+  log.info('Saving settings...');
+  const oldEnableExtension = store.get('enableExtension', false);
 
   store.set('volume', settings.volume);
   store.set('keyboard.width', settings.keyboardWidth);
@@ -623,43 +712,35 @@ ipcMain.on('save-settings', async (event, settings) => {
   store.set('tabs', settings.tabs);
   store.set('enableExtension', settings.enableExtension);
 
-  // Handle extension loading/unloading if the setting changed
   if (oldEnableExtension !== settings.enableExtension) {
     if (settings.enableExtension) {
-      if (!autodartsToolsExtensionId) {
-        const extensionPath = path.join(__dirname, 'Extension');
-        if (fs.existsSync(extensionPath)) {
-          try {
-            const extension = await session.defaultSession.loadExtension(extensionPath, { allowFileAccess: true });
-            autodartsToolsExtensionId = extension.id;
-            console.log('SUCCESS: Autodarts Tools extension dynamically loaded with ID:', autodartsToolsExtensionId);
-          } catch (error) {
-            console.error('ERROR: Failed to dynamically load extension:', error);
-          }
+      if (!autodartsToolsExtensionId && fs.existsSync(EXTENSION_DIR)) {
+        try {
+          const extension = await session.defaultSession.loadExtension(EXTENSION_DIR, { allowFileAccess: true });
+          autodartsToolsExtensionId = extension.id;
+          log.info('Autodarts Tools extension dynamically loaded.');
+        } catch (error) {
+          log.error('Failed to dynamically load extension:', error);
         }
       }
     } else {
       if (autodartsToolsExtensionId) {
         try {
           await session.defaultSession.removeExtension(autodartsToolsExtensionId);
-          console.log('SUCCESS: Autodarts Tools extension dynamically unloaded.');
+          log.info('Autodarts Tools extension dynamically unloaded.');
           autodartsToolsExtensionId = null;
         } catch (error) {
-          console.error('ERROR: Failed to dynamically unload extension:', error);
+          log.error('Failed to dynamically unload extension:', error);
         }
       }
     }
   }
 
-  // Apply settings that don't require a reload
   applySettings();
 
-  // Defer the reload to prevent the app from crashing.
-  // This gives the settings view time to close before views are recreated.
   setTimeout(async () => {
     await reloadDynamicViews();
 
-    // After the reload, switch back to the previous view or a fallback.
     if (previousView && views[previousView]) {
       showTab(previousView);
     } else {
@@ -668,10 +749,9 @@ ipcMain.on('save-settings', async (event, settings) => {
     }
     previousView = null;
     autoCloseEnabled = true;
-    console.log('Settings saved and dynamic views reloaded successfully.');
-  }, 100); // A short delay is sufficient
+    log.info('Settings saved and dynamic views reloaded successfully.');
+  }, 100);
 
-  // Hide the keyboard and settings view immediately.
   hideKeyboardView();
 });
 
@@ -819,24 +899,16 @@ ipcMain.on('keyboard-shift-status', (ev, isActive) => {
 });
 
 app.whenReady().then(async () => {
-  const enableExtension = store.get('enableExtension', true);
-  if (enableExtension) {
-    const extensionPath = path.join(__dirname, 'Extension');
-    if (fs.existsSync(extensionPath)) {
-      try {
-        const extension = await session.defaultSession.loadExtension(extensionPath, { allowFileAccess: true });
-        autodartsToolsExtensionId = extension.id;
-        console.log('SUCCESS: Autodarts Tools extension loaded with ID:', autodartsToolsExtensionId);
-      } catch (error) {
-        console.error('ERROR: Failed to load Autodarts Tools extension:', error);
-      }
-    } else {
-      console.warn('WARN: Autodarts Tools extension directory not found, skipping load.');
+  const enableExtension = store.get('enableExtension', false);
+  if (enableExtension && fs.existsSync(EXTENSION_DIR)) {
+    try {
+      const extension = await session.defaultSession.loadExtension(EXTENSION_DIR, { allowFileAccess: true });
+      autodartsToolsExtensionId = extension.id;
+      log.info('Autodarts Tools extension loaded successfully on startup.');
+    } catch (error) {
+      log.error('Failed to load Autodarts Tools extension on startup:', error);
     }
-  } else {
-    console.log('INFO: Autodarts Tools extension is disabled by user setting.');
   }
-
   createWindow();
 });
 
