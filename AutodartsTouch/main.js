@@ -8,9 +8,6 @@ const unzipper = require('unzipper');
 const semver = require('semver');
 const log = require('electron-log');
 
-// Set log file path to userData directory
-log.transports.file.resolvePathFn(() => path.join(app.getPath('userData'), 'logs', 'main.log'));
-
 const store = new Store();
 
 let mainWindow;
@@ -19,13 +16,12 @@ let toolbarView;
 let keyboardView;
 let settingsView;
 let powerMenuView;
-let currentView = 'tab0'; // Default to the first tab
+let currentView = 'tab0';
 let previousView = null;
 let autodartsToolsExtensionId = null;
 
 const GITHUB_REPO = 'creazy231/tools-for-autodarts';
-// Use app.getPath('userData') for storing the extension
-const EXTENSION_DIR = path.join(app.getPath('userData'), 'Extension');
+let EXTENSION_DIR; // Will be initialized once the app is ready
 
 // Helper function to get latest release info (version and download URL)
 async function getLatestExtensionInfo() {
@@ -116,8 +112,8 @@ const TOOLBAR_HEIGHT = 72;
 const KEYBOARD_HEIGHT = 300;
 let keyboardVisible = false;
 let shiftActive = false;
-let keyboardActualHeight = 300; // Dynamic keyboard height
-let autoCloseEnabled = true; // Option to disable auto-close
+let keyboardActualHeight = 300;
+let autoCloseEnabled = true;
 
 async function createWindow() {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
@@ -134,7 +130,6 @@ async function createWindow() {
     }
   });
 
-  // Create static views that are never reloaded
   settingsView = new BrowserView({ webPreferences: { contextIsolation: true, sandbox: false, preload: path.join(__dirname, 'preload.js') } });
   mainWindow.addBrowserView(settingsView);
   settingsView.webContents.loadFile(path.join(__dirname, 'settings.html'));
@@ -146,7 +141,6 @@ async function createWindow() {
   mainWindow.addBrowserView(powerMenuView);
   powerMenuView.webContents.loadFile(path.join(__dirname, 'power-menu.html'));
 
-  // Load dynamic views for the first time
   await reloadDynamicViews();
 
   mainWindow.on('resize', () => {
@@ -160,7 +154,6 @@ async function createWindow() {
 function createDynamicViews() {
   const loadingPromises = [];
 
-  // Tab views
   const tabs = store.get('tabs', [
     { name: 'Autodarts', url: 'https://play.autodarts.io/' },
     { name: 'Service', url: 'http://localhost:3180/' }
@@ -174,21 +167,17 @@ function createDynamicViews() {
     }
   });
 
-  // Toolbar view
   toolbarView = new BrowserView({
     webPreferences: { contextIsolation: true, sandbox: false, preload: path.join(__dirname, 'preload.js') }
   });
   mainWindow.addBrowserView(toolbarView);
   loadingPromises.push(toolbarView.webContents.loadFile(path.join(__dirname, 'index.html')));
 
-  // Keyboard view
-  const keyboardLayout = store.get('keyboard.layout', 'de');
   keyboardView = new BrowserView({
     webPreferences: { contextIsolation: true, sandbox: false, preload: path.join(__dirname, 'preload.js') },
     transparent: true
   });
   mainWindow.addBrowserView(keyboardView);
-  // The keyboard now fetches its own layout, so we don't need to pass it as a query param.
   loadingPromises.push(keyboardView.webContents.loadFile(path.join(__dirname, 'keyboard', 'index.html')));
 
   return Promise.all(loadingPromises).catch(e => log.error('Error loading one or more dynamic views:', e));
@@ -198,12 +187,7 @@ async function reloadDynamicViews() {
   log.info('Reloading dynamic views...');
   if (!mainWindow) return;
 
-  // 1. Destroy only the dynamic views
-  const dynamicViews = [
-    ...Object.values(views),
-    toolbarView,
-    keyboardView,
-  ];
+  const dynamicViews = [ ...Object.values(views), toolbarView, keyboardView ];
   dynamicViews.forEach(view => {
     if (view && !view.webContents.isDestroyed()) {
       mainWindow.removeBrowserView(view);
@@ -211,13 +195,11 @@ async function reloadDynamicViews() {
     }
   });
 
-  // 2. Reset dynamic view containers
   views = {};
   toolbarView = null;
   keyboardView = null;
   keyboardVisible = false;
 
-  // 3. Re-create dynamic views and wait for them to load
   try {
     await createDynamicViews();
     log.info('Dynamic views finished loading.');
@@ -226,12 +208,10 @@ async function reloadDynamicViews() {
     return;
   }
 
-  // 4. Determine initial tab and layout the UI
   let firstAvailableTab = Object.keys(views).length > 0 ? 'tab0' : null;
   currentView = firstAvailableTab;
   showTab(currentView);
 
-  // 5. Apply settings and run setup
   applySettings();
   setTimeout(() => {
     setupAutoKeyboard();
@@ -244,29 +224,15 @@ function showTab(tab) {
   if (!mainWindow) return;
   const [w, h] = mainWindow.getSize();
 
-  // Calculate available height for content
   const availableHeight = h - TOOLBAR_HEIGHT - (keyboardVisible ? keyboardActualHeight : 0);
-  log.info(`Layout update - Window: ${w}x${h}, Available content height: ${availableHeight}, Keyboard visible: ${keyboardVisible}, Keyboard height: ${keyboardActualHeight}`);
 
   Object.keys(views).forEach(k => {
     const v = views[k];
     if (k === tab) {
-      // Active view gets the full available space
-      v.setBounds({ 
-        x: 0, 
-        y: TOOLBAR_HEIGHT, 
-        width: w, 
-        height: availableHeight
-      });
+      v.setBounds({ x: 0, y: TOOLBAR_HEIGHT, width: w, height: availableHeight });
       v.setAutoResize({ width: true, height: true });
     } else {
-      // Hidden views are moved off-screen
-      v.setBounds({ 
-        x: 0, 
-        y: h, 
-        width: w, 
-        height: availableHeight 
-      });
+      v.setBounds({ x: 0, y: h, width: w, height: availableHeight });
       v.setAutoResize({ width: true, height: true });
     }
   });
@@ -287,7 +253,6 @@ function showTab(tab) {
 
   currentView = tab;
 
-  // Notify the toolbar that the active view has changed.
   if (toolbarView && toolbarView.webContents && !toolbarView.webContents.isDestroyed()) {
     toolbarView.webContents.send('active-view-changed', currentView);
   }
@@ -298,57 +263,33 @@ function showTab(tab) {
 function updateMainViewBounds() {
   if (!mainWindow) return;
   const [w, h] = mainWindow.getSize();
-
-  // Determine the active view
   const activeView = (currentView === 'settings') ? settingsView : views[currentView];
   if (!activeView || !activeView.webContents || activeView.webContents.isDestroyed()) {
     log.error(`updateMainViewBounds: Cannot resize invalid or destroyed active view: ${currentView}`);
     return;
   }
-
-  // Calculate available height for content
   const availableHeight = h - TOOLBAR_HEIGHT - (keyboardVisible ? keyboardActualHeight : 0);
-
-  // Set bounds for only the active view
-  activeView.setBounds({
-    x: 0,
-    y: TOOLBAR_HEIGHT,
-    width: w,
-    height: availableHeight
-  });
+  activeView.setBounds({ x: 0, y: TOOLBAR_HEIGHT, width: w, height: availableHeight });
 }
 
 function updateKeyboardBounds() {
   if (!mainWindow || !keyboardView) return;
   const [w, h] = mainWindow.getSize();
-  
-  // Position keyboard at the bottom
-  keyboardView.setBounds({ 
-    x: 0, 
-    y: h - keyboardActualHeight, 
-    width: w, 
-    height: keyboardActualHeight 
-  });
+  keyboardView.setBounds({ x: 0, y: h - keyboardActualHeight, width: w, height: keyboardActualHeight });
   keyboardView.setAutoResize({ width: true });
 }
 
 function showKeyboardView() {
   if (!keyboardVisible) {
     log.info('Showing keyboard view');
-    
     if (keyboardView && keyboardView.webContents) {
       keyboardView.webContents.executeJavaScript('window.showKeyboard && window.showKeyboard()').catch(e => log.error('Failed to reset keyboard:', e));
     }
-    
     keyboardVisible = true;
-    
     applyKeyboardStyle();
-    showTab(currentView); // This will resize the main view
-    updateKeyboardBounds(); // This will position the keyboard correctly
-    
-    setTimeout(() => {
-      measureKeyboardHeight();
-    }, 100);
+    showTab(currentView);
+    updateKeyboardBounds();
+    setTimeout(measureKeyboardHeight, 100);
   }
 }
 
@@ -356,14 +297,10 @@ function hideKeyboardView() {
   if (keyboardVisible) {
     log.info('Hiding keyboard view');
     keyboardVisible = false;
-    
-    // Move keyboard off-screen instead of removing it
     if (mainWindow && keyboardView) {
       const [w, h] = mainWindow.getSize();
       keyboardView.setBounds({ x: 0, y: h, width: w, height: keyboardActualHeight });
     }
-
-    // Update layout without keyboard
     showTab(currentView);
   }
 }
@@ -399,26 +336,15 @@ function measureKeyboardHeight() {
 }
 
 function toggleKeyboardView() {
-  if (keyboardVisible) {
-    hideKeyboardView();
-  } else {
-    showKeyboardView();
-  }
+  if (keyboardVisible) hideKeyboardView(); else showKeyboardView();
 }
 
 function applySettings() {
   const volume = store.get('volume', 50);
-
-  // Set system volume
-  exec(`amixer -D pulse sset Master ${volume}%`, (error, stdout, stderr) => {
-    if (error) {
-      log.error(`exec error: ${error}`);
-      return;
-    }
-    log.info(`System volume set to ${volume}%`);
+  exec(`amixer -D pulse sset Master ${volume}%`, (error) => {
+    if (error) log.error(`exec error: ${error}`);
+    else log.info(`System volume set to ${volume}%`);
   });
-
-  // Also apply keyboard style if visible
   applyKeyboardStyle();
 }
 
@@ -426,102 +352,52 @@ function applyKeyboardStyle(style) {
   const keyboardWidth = style ? style.width : store.get('keyboard.width', 100);
   const keyHeight = style ? style.keyHeight : store.get('keyboard.keyHeight', 50);
   const keyboardLayout = style ? style.layout : store.get('keyboard.layout', 'de');
-
   if (keyboardView && keyboardView.webContents) {
-    const sendStyle = () => {
-      keyboardView.webContents.send('update-keyboard-style', {
-        width: keyboardWidth,
-        keyHeight: keyHeight,
-        layout: keyboardLayout
-      });
-    };
-    if (keyboardView.webContents.isLoading()) {
-      keyboardView.webContents.once('dom-ready', sendStyle);
-    } else {
-      sendStyle();
-    }
+    const sendStyle = () => keyboardView.webContents.send('update-keyboard-style', { width: keyboardWidth, keyHeight: keyHeight, layout: keyboardLayout });
+    if (keyboardView.webContents.isLoading()) keyboardView.webContents.once('dom-ready', sendStyle);
+    else sendStyle();
   }
 }
 
-// Helper function to inject focus detection script reliably
 function injectFocusDetector(view, viewName) {
   if (!view || !view.webContents || view.webContents.isDestroyed()) {
     log.error(`[Debug] Skipping focus injection for invalid/destroyed view: ${viewName}`);
     return;
   }
-
-  // This script is injected into each webview to detect when an input is focused.
-  const script = `
-      (function() {
-        if (window.keyboardFocusHandlersInstalled) {
-          return;
-        }
-        window.keyboardFocusHandlersInstalled = true;
-
-        function isInputElement(element) {
-          if (!element) return false;
-          const tagName = element.tagName ? element.tagName.toLowerCase() : '';
-          const type = element.type ? element.type.toLowerCase() : '';
-          const isContentEditable = element.contentEditable === 'true' || element.getAttribute('contenteditable') === 'true';
-          return tagName === 'input' || tagName === 'textarea' || isContentEditable;
-        }
-
-        function notifyMainProcess(eventType) {
-          if (window.electronAPI && typeof window.electronAPI.inputFocused === 'function') {
-            if (eventType === 'focus') {
-              window.electronAPI.inputFocused('${viewName}');
-            } else {
-              window.electronAPI.inputBlurred('${viewName}');
-            }
-          }
-        }
-
-        function handleFocus(event) {
-          if (isInputElement(event.target)) {
-            notifyMainProcess('focus');
-          }
-        }
-
-        function handleBlur(event) {
-          if (isInputElement(event.target)) {
-            setTimeout(() => {
-              if (!document.activeElement || !isInputElement(document.activeElement)) {
-                notifyMainProcess('blur');
-              }
-            }, 100);
-          }
-        }
-
-        document.addEventListener('focusin', handleFocus, true);
-        document.addEventListener('focusout', handleBlur, true);
-      })();
-  `;
-
-  const doInjection = () => {
-      view.webContents.executeJavaScript(script).catch(err => {
-          log.error(`[Debug] FAILED to inject focus script into ${viewName}:`, err);
-      });
-  };
-
-  if (view.webContents.isLoading()) {
-      view.webContents.once('dom-ready', doInjection);
-  } else {
-      doInjection();
-  }
+  const script = `(function() {
+    if (window.keyboardFocusHandlersInstalled) return;
+    window.keyboardFocusHandlersInstalled = true;
+    function isInputElement(el) {
+      if (!el) return false;
+      const tn = el.tagName ? el.tagName.toLowerCase() : '';
+      const ty = el.type ? el.type.toLowerCase() : '';
+      return tn === 'input' || tn === 'textarea' || el.contentEditable === 'true';
+    }
+    function notify(type) {
+      if (window.electronAPI) {
+        if (type === 'focus') window.electronAPI.inputFocused('${viewName}');
+        else window.electronAPI.inputBlurred('${viewName}');
+      }
+    }
+    document.addEventListener('focusin', e => { if (isInputElement(e.target)) notify('focus'); }, true);
+    document.addEventListener('focusout', e => {
+      if (isInputElement(e.target)) setTimeout(() => {
+        if (!document.activeElement || !isInputElement(document.activeElement)) notify('blur');
+      }, 100);
+    }, true);
+  })();`;
+  const doInjection = () => view.webContents.executeJavaScript(script).catch(err => log.error(`[Debug] FAILED to inject focus script into ${viewName}:`, err));
+  if (view.webContents.isLoading()) view.webContents.once('dom-ready', doInjection);
+  else doInjection();
 }
 
 function setupAutoKeyboard() {
-  const allViews = { ...views, settings: settingsView };
-
-  Object.entries(allViews).forEach(([viewName, view]) => {
-      if (!view || view.webContents.isDestroyed()) {
-          return;
-      }
-      injectFocusDetector(view, viewName);
+  Object.entries({ ...views, settings: settingsView }).forEach(([viewName, view]) => {
+    if (view && !view.webContents.isDestroyed()) injectFocusDetector(view, viewName);
   });
 }
 
-// IPC
+// IPC Handlers
 ipcMain.on('open-settings', () => {
   if (currentView !== 'settings') {
     previousView = currentView;
@@ -531,6 +407,7 @@ ipcMain.on('open-settings', () => {
     autoCloseEnabled = false;
   }
 });
+
 ipcMain.on('switch-tab', (ev, tab) => {
   if (tab && views[tab]) {
     if (currentView === 'settings' && tab !== 'settings') {
@@ -541,6 +418,7 @@ ipcMain.on('switch-tab', (ev, tab) => {
     showTab(tab);
   }
 });
+
 ipcMain.on('refresh', () => {
   const view = (currentView === 'settings') ? settingsView : views[currentView];
   if (view) view.webContents.reload();
@@ -551,33 +429,27 @@ ipcMain.on('force-reload', () => {
   if (view) {
     const tabs = store.get('tabs', []);
     const tabIndex = parseInt(currentView.replace('tab', ''), 10);
-    if (tabs[tabIndex] && tabs[tabIndex].url) {
-      view.webContents.loadURL(tabs[tabIndex].url);
-    }
+    if (tabs[tabIndex] && tabs[tabIndex].url) view.webContents.loadURL(tabs[tabIndex].url);
   }
 });
 
 ipcMain.on('toggle-webkeyboard', () => {
-  if (currentView === 'settings') {
-    showKeyboardView();
-    return;
-  }
-  toggleKeyboardView();
+  if (currentView === 'settings') showKeyboardView(); else toggleKeyboardView();
 });
 
 ipcMain.on('open-power-menu', () => {
-    if (mainWindow && powerMenuView && !powerMenuView.webContents.isDestroyed()) {
-        const [w, h] = mainWindow.getSize();
-        powerMenuView.setBounds({ x: 0, y: 0, width: w, height: h });
-        mainWindow.setTopBrowserView(powerMenuView);
-    }
+  if (mainWindow && powerMenuView && !powerMenuView.webContents.isDestroyed()) {
+    const [w, h] = mainWindow.getSize();
+    powerMenuView.setBounds({ x: 0, y: 0, width: w, height: h });
+    mainWindow.setTopBrowserView(powerMenuView);
+  }
 });
 
 ipcMain.on('close-power-menu', () => {
-    if (mainWindow && powerMenuView && !powerMenuView.webContents.isDestroyed()) {
-        const [w, h] = mainWindow.getSize();
-        powerMenuView.setBounds({ x: 0, y: h, width: w, height: h });
-    }
+  if (mainWindow && powerMenuView && !powerMenuView.webContents.isDestroyed()) {
+    const [w, h] = mainWindow.getSize();
+    powerMenuView.setBounds({ x: 0, y: h, width: w, height: h });
+  }
 });
 
 ipcMain.handle('getExtensionVersions', async () => {
@@ -585,9 +457,7 @@ ipcMain.handle('getExtensionVersions', async () => {
   try {
     const installed = getInstalledExtensionVersion();
     const latestInfo = await getLatestExtensionInfo();
-    if (!latestInfo) {
-      return { error: 'Could not fetch latest version info from GitHub.' };
-    }
+    if (!latestInfo) return { error: 'Could not fetch latest version info from GitHub.' };
     const latest = latestInfo.version;
     const isUpdateAvailable = installed && latest ? semver.gt(latest, installed) : false;
     log.info(`IPC: getExtensionVersions returning: installed=${installed}, latest=${latest}, updateAvailable=${isUpdateAvailable}`);
@@ -633,19 +503,9 @@ ipcMain.on('open-log-file', () => {
 
 ipcMain.on('power-control', (event, action) => {
   switch (action) {
-    case 'shutdown':
-      exec('shutdown -h now', (err) => {
-        if (err) log.error('Shutdown command failed:', err);
-      });
-      break;
-    case 'restart':
-      exec('reboot', (err) => {
-        if (err) log.error('Restart command failed:', err);
-      });
-      break;
-    case 'close-app':
-      app.quit();
-      break;
+    case 'shutdown': exec('shutdown -h now', (err) => { if (err) log.error('Shutdown command failed:', err); }); break;
+    case 'restart': exec('reboot', (err) => { if (err) log.error('Restart command failed:', err); }); break;
+    case 'close-app': app.quit(); break;
   }
 });
 
@@ -653,9 +513,7 @@ ipcMain.handle('get-keyboard-layouts', async () => {
   const layoutDir = path.join(__dirname, 'keyboard', 'layouts');
   try {
     const files = await fs.promises.readdir(layoutDir);
-    return files
-      .filter(file => file.endsWith('.js'))
-      .map(file => file.replace('.js', ''));
+    return files.filter(file => file.endsWith('.js')).map(file => file.replace('.js', ''));
   } catch (error) {
     log.error(`FATAL: Could not read keyboard layouts from ${layoutDir}.`, error);
     return [];
@@ -664,24 +522,12 @@ ipcMain.handle('get-keyboard-layouts', async () => {
 
 ipcMain.handle('get-keyboard-layout-data', async (event, layoutName) => {
   const requestedLayout = (layoutName || '').toLowerCase();
-  if (!requestedLayout) {
-    log.error('Request for invalid or empty layout name rejected.');
-    return null;
-  }
-
+  if (!requestedLayout) { log.error('Request for invalid or empty layout name rejected.'); return null; }
   const layoutDir = path.join(__dirname, 'keyboard', 'layouts');
-
   try {
     const files = await fs.promises.readdir(layoutDir);
-    const targetFile = files.find(file =>
-      path.basename(file, '.js').toLowerCase() === requestedLayout
-    );
-
-    if (!targetFile) {
-      log.error(`Layout file not found for '${layoutName}' in directory ${layoutDir}`);
-      return null;
-    }
-
+    const targetFile = files.find(file => path.basename(file, '.js').toLowerCase() === requestedLayout);
+    if (!targetFile) { log.error(`Layout file not found for '${layoutName}' in directory ${layoutDir}`); return null; }
     const layoutPath = path.join(layoutDir, targetFile);
     const layoutData = require(layoutPath);
     delete require.cache[require.resolve(layoutPath)];
@@ -709,14 +555,7 @@ ipcMain.handle('get-settings', async () => {
 ipcMain.on('save-settings', async (event, settings) => {
   log.info('Saving settings...');
   const oldEnableExtension = store.get('enableExtension', false);
-
-  store.set('volume', settings.volume);
-  store.set('keyboard.width', settings.keyboardWidth);
-  store.set('keyboard.keyHeight', settings.keyHeight);
-  store.set('keyboard.layout', settings.keyboardLayout);
-  store.set('tabs', settings.tabs);
-  store.set('enableExtension', settings.enableExtension);
-
+  store.set(settings);
   if (oldEnableExtension !== settings.enableExtension) {
     if (settings.enableExtension) {
       if (!autodartsToolsExtensionId && fs.existsSync(EXTENSION_DIR)) {
@@ -740,23 +579,15 @@ ipcMain.on('save-settings', async (event, settings) => {
       }
     }
   }
-
   applySettings();
-
   setTimeout(async () => {
     await reloadDynamicViews();
-
-    if (previousView && views[previousView]) {
-      showTab(previousView);
-    } else {
-      const firstTab = Object.keys(views).find(k => k.startsWith('tab'));
-      showTab(firstTab || null);
-    }
+    if (previousView && views[previousView]) showTab(previousView);
+    else showTab(Object.keys(views).find(k => k.startsWith('tab')) || null);
     previousView = null;
     autoCloseEnabled = true;
     log.info('Settings saved and dynamic views reloaded successfully.');
   }, 100);
-
   hideKeyboardView();
 });
 
@@ -770,33 +601,16 @@ ipcMain.on('set-cursor-visibility', (event, visible) => {
     });
 });
 
-ipcMain.handle('get-tabs', async () => {
-  return store.get('tabs', [
-    { name: 'Autodarts', url: 'https://play.autodarts.io/' },
-    { name: 'Service', url: 'http://localhost:3180/' }
-  ]);
-});
-
-ipcMain.handle('get-current-view', () => {
-  return currentView;
-});
-
+ipcMain.handle('get-tabs', async () => store.get('tabs', [ { name: 'Autodarts', url: 'https://play.autodarts.io/' }, { name: 'Service', url: 'http://localhost:3180/' } ]));
+ipcMain.handle('get-current-view', () => currentView);
 ipcMain.on('close-settings', () => {
-  // Restore original settings from store before closing, discarding any live changes
   applySettings();
-
-  if (previousView) {
-    showTab(previousView);
-  }
+  if (previousView) showTab(previousView);
   hideKeyboardView();
   autoCloseEnabled = true;
 });
 
-// For live preview of keyboard settings
-ipcMain.on('update-keyboard-style-live', (event, style) => {
-  applyKeyboardStyle(style);
-});
-
+ipcMain.on('update-keyboard-style-live', (event, style) => applyKeyboardStyle(style));
 ipcMain.on('keyboard-height-changed', (event, height) => {
   if (height && height > 100) {
     if (keyboardActualHeight !== height) {
@@ -816,8 +630,6 @@ ipcMain.on('keyboard-height-changed', (event, height) => {
     }
   }
 });
-
-// Auto-focus keyboard handlers
 ipcMain.on('input-focused', (event, viewName) => {
   log.info(`[FOCUS_DEBUG] Main process received 'input-focused' from view: ${viewName}.`);
   if (!keyboardVisible) {
@@ -839,17 +651,12 @@ ipcMain.on('input-blurred', (event, viewName) => {
   }
 });
 
-// receive key presses from keyboard page (via preload -> ipc)
 ipcMain.on('webkeyboard-key', (ev, key) => {
   const targetView = (currentView === 'settings') ? settingsView : views[currentView];
-
   if (!targetView || !targetView.webContents || targetView.webContents.isDestroyed()) {
     log.error(`Cannot send key to invalid or destroyed view: ${currentView}`);
     return;
   }
-
-  log.info(`Sending key '${key}' to view '${currentView}'. Shift active: ${shiftActive}`);
-
   if (key === '{bksp}') {
     targetView.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Backspace' });
     targetView.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Backspace' });
@@ -861,21 +668,22 @@ ipcMain.on('webkeyboard-key', (ev, key) => {
   } else if (key === '{tab}') {
     targetView.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Tab' });
     targetView.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Tab' });
-  } else if (key === '{shift}') {
-    shiftActive = !shiftActive;
-  } else if (key === '{capslock}') {
+  } else if (key === '{shift}' || key === '{capslock}') {
     shiftActive = !shiftActive;
   } else {
     targetView.webContents.sendInputEvent({ type: 'char', keyCode: key });
   }
 });
 
-// Receive shift status updates from keyboard
 ipcMain.on('keyboard-shift-status', (ev, isActive) => {
   shiftActive = isActive;
 });
 
 app.whenReady().then(async () => {
+  // Initialize paths now that app is ready
+  EXTENSION_DIR = path.join(app.getPath('userData'), 'Extension');
+  log.transports.file.resolvePathFn(() => path.join(app.getPath('userData'), 'logs', 'main.log'));
+
   const enableExtension = store.get('enableExtension', false);
   if (enableExtension && fs.existsSync(EXTENSION_DIR)) {
     try {
