@@ -453,6 +453,239 @@ app.whenReady().then(async () => {
     shell.showItemInFolder(logFilePath);
   });
 
+  // Other IPC Handlers not dependent on app paths
+  ipcMain.on('open-settings', () => {
+    if (currentView !== 'settings') {
+      previousView = currentView;
+      settingsView.webContents.reload();
+      showTab('settings');
+      showKeyboardView();
+      autoCloseEnabled = false;
+    }
+  });
+
+  ipcMain.on('switch-tab', (ev, tab) => {
+    if (tab && views[tab]) {
+      if (currentView === 'settings' && tab !== 'settings') {
+        applySettings();
+        hideKeyboardView();
+        autoCloseEnabled = true;
+      }
+      showTab(tab);
+    }
+  });
+
+  ipcMain.on('refresh', () => {
+    const view = (currentView === 'settings') ? settingsView : views[currentView];
+    if (view) view.webContents.reload();
+  });
+
+  ipcMain.on('force-reload', () => {
+    const view = views[currentView];
+    if (view) {
+      const tabs = store.get('tabs', []);
+      const tabIndex = parseInt(currentView.replace('tab', ''), 10);
+      if (tabs[tabIndex] && tabs[tabIndex].url) view.webContents.loadURL(tabs[tabIndex].url);
+    }
+  });
+
+  ipcMain.on('toggle-webkeyboard', () => {
+    if (currentView === 'settings') showKeyboardView(); else toggleKeyboardView();
+  });
+
+  ipcMain.on('open-power-menu', () => {
+    if (mainWindow && powerMenuView && !powerMenuView.webContents.isDestroyed()) {
+      const [w, h] = mainWindow.getSize();
+      powerMenuView.setBounds({ x: 0, y: 0, width: w, height: h });
+      mainWindow.setTopBrowserView(powerMenuView);
+    }
+  });
+
+  ipcMain.on('close-power-menu', () => {
+    if (mainWindow && powerMenuView && !powerMenuView.webContents.isDestroyed()) {
+      const [w, h] = mainWindow.getSize();
+      powerMenuView.setBounds({ x: 0, y: h, width: w, height: h });
+    }
+  });
+
+  ipcMain.on('power-control', (event, action) => {
+    switch (action) {
+      case 'shutdown': exec('shutdown -h now', (err) => { if (err) log.error('Shutdown command failed:', err); }); break;
+      case 'restart': exec('reboot', (err) => { if (err) log.error('Restart command failed:', err); }); break;
+      case 'close-app': app.quit(); break;
+    }
+  });
+
+  ipcMain.handle('get-keyboard-layouts', async () => {
+    const layoutDir = path.join(__dirname, 'keyboard', 'layouts');
+    try {
+      const files = await fs.promises.readdir(layoutDir);
+      return files.filter(file => file.endsWith('.js')).map(file => file.replace('.js', ''));
+    } catch (error) {
+      log.error(`FATAL: Could not read keyboard layouts from ${layoutDir}.`, error);
+      return [];
+    }
+  });
+
+  ipcMain.handle('get-keyboard-layout-data', async (event, layoutName) => {
+    const requestedLayout = (layoutName || '').toLowerCase();
+    if (!requestedLayout) { log.error('Request for invalid or empty layout name rejected.'); return null; }
+    const layoutDir = path.join(__dirname, 'keyboard', 'layouts');
+    try {
+      const files = await fs.promises.readdir(layoutDir);
+      const targetFile = files.find(file => path.basename(file, '.js').toLowerCase() === requestedLayout);
+      if (!targetFile) { log.error(`Layout file not found for '${layoutName}' in directory ${layoutDir}`); return null; }
+      const layoutPath = path.join(layoutDir, targetFile);
+      const layoutData = require(layoutPath);
+      delete require.cache[require.resolve(layoutPath)];
+      return layoutData;
+    } catch (error) {
+      log.error(`FATAL: Could not load layout module for '${layoutName}'.`, error);
+      return null;
+    }
+  });
+
+  ipcMain.handle('get-settings', async () => {
+    return {
+      volume: store.get('volume', 50),
+      keyboardWidth: store.get('keyboard.width', 100),
+      keyHeight: store.get('keyboard.keyHeight', 50),
+      keyboardLayout: store.get('keyboard.layout', 'de'),
+      enableExtension: store.get('enableExtension', false),
+      tabs: store.get('tabs', [
+        { name: 'Autodarts', url: 'https://play.autodarts.io/' },
+        { name: 'Service', url: 'http://localhost:3180/' }
+      ])
+    };
+  });
+
+  ipcMain.on('save-settings', async (event, settings) => {
+    log.info('Saving settings...');
+    const oldEnableExtension = store.get('enableExtension', false);
+    store.set(settings);
+    if (oldEnableExtension !== settings.enableExtension) {
+      if (settings.enableExtension) {
+        if (!autodartsToolsExtensionId && fs.existsSync(EXTENSION_DIR)) {
+          try {
+            const extension = await session.defaultSession.loadExtension(EXTENSION_DIR, { allowFileAccess: true });
+            autodartsToolsExtensionId = extension.id;
+            log.info('Autodarts Tools extension dynamically loaded.');
+          } catch (error) {
+            log.error('Failed to dynamically load extension:', error);
+          }
+        }
+      } else {
+        if (autodartsToolsExtensionId) {
+          try {
+            await session.defaultSession.removeExtension(autodartsToolsExtensionId);
+            log.info('Autodarts Tools extension dynamically unloaded.');
+            autodartsToolsExtensionId = null;
+          } catch (error) {
+            log.error('Failed to dynamically unload extension:', error);
+          }
+        }
+      }
+    }
+    applySettings();
+    setTimeout(async () => {
+      await reloadDynamicViews();
+      if (previousView && views[previousView]) showTab(previousView);
+      else showTab(Object.keys(views).find(k => k.startsWith('tab')) || null);
+      previousView = null;
+      autoCloseEnabled = true;
+      log.info('Settings saved and dynamic views reloaded successfully.');
+    }, 100);
+    hideKeyboardView();
+  });
+
+  ipcMain.on('set-cursor-visibility', (event, visible) => {
+      const css = `* { cursor: ${visible ? 'default' : 'none'} !important; }`;
+      const allViews = [...Object.values(views), toolbarView, settingsView, keyboardView, powerMenuView];
+      allViews.forEach(view => {
+          if (view && view.webContents && !view.webContents.isDestroyed()) {
+              view.webContents.insertCSS(css).catch(e => log.error(`Failed to set cursor visibility for a view: ${e}`));
+          }
+      });
+  });
+
+  ipcMain.handle('get-tabs', async () => store.get('tabs', [ { name: 'Autodarts', url: 'https://play.autodarts.io/' }, { name: 'Service', url: 'http://localhost:3180/' } ]));
+  ipcMain.handle('get-current-view', () => currentView);
+  ipcMain.on('close-settings', () => {
+    applySettings();
+    if (previousView) showTab(previousView);
+    hideKeyboardView();
+    autoCloseEnabled = true;
+  });
+
+  ipcMain.on('update-keyboard-style-live', (event, style) => applyKeyboardStyle(style));
+  ipcMain.on('keyboard-height-changed', (event, height) => {
+    if (height && height > 100) {
+      if (keyboardActualHeight !== height) {
+        log.info(`IPC: Keyboard height updated to ${height}px`);
+        keyboardActualHeight = height;
+        if (keyboardVisible) {
+          updateKeyboardBounds();
+          updateMainViewBounds();
+        }
+      }
+    } else {
+      log.warn(`IPC: Received invalid keyboard height: ${height}px. Using fallback.`);
+      keyboardActualHeight = 250;
+      if (keyboardVisible) {
+        updateKeyboardBounds();
+        updateMainViewBounds();
+      }
+    }
+  });
+  ipcMain.on('input-focused', (event, viewName) => {
+    log.info(`[FOCUS_DEBUG] Main process received 'input-focused' from view: ${viewName}.`);
+    if (!keyboardVisible) {
+      log.info('[FOCUS_DEBUG] Keyboard not visible, showing it now.');
+      showKeyboardView();
+    }
+  });
+
+  ipcMain.on('input-blurred', (event, viewName) => {
+    log.info(`[FOCUS_DEBUG] Main process received 'input-blurred' from view: ${viewName}.`);
+    if (keyboardVisible && autoCloseEnabled) {
+      log.info('[FOCUS_DEBUG] Keyboard is visible and auto-close is enabled. Hiding keyboard after delay.');
+      setTimeout(() => {
+        if (keyboardVisible && autoCloseEnabled) {
+          log.info('[FOCUS_DEBUG] Auto-hiding keyboard now.');
+          hideKeyboardView();
+        }
+      }, 300);
+    }
+  });
+
+  ipcMain.on('webkeyboard-key', (ev, key) => {
+    const targetView = (currentView === 'settings') ? settingsView : views[currentView];
+    if (!targetView || !targetView.webContents || targetView.webContents.isDestroyed()) {
+      log.error(`Cannot send key to invalid or destroyed view: ${currentView}`);
+      return;
+    }
+    if (key === '{bksp}') {
+      targetView.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Backspace' });
+      targetView.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Backspace' });
+    } else if (key === '{enter}') {
+      targetView.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Enter' });
+      targetView.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Enter' });
+    } else if (key === '{space}' || key === ' ') {
+      targetView.webContents.sendInputEvent({ type: 'char', keyCode: ' ' });
+    } else if (key === '{tab}') {
+      targetView.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Tab' });
+      targetView.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Tab' });
+    } else if (key === '{shift}' || key === '{capslock}') {
+      shiftActive = !shiftActive;
+    } else {
+      targetView.webContents.sendInputEvent({ type: 'char', keyCode: key });
+    }
+  });
+
+  ipcMain.on('keyboard-shift-status', (ev, isActive) => {
+    shiftActive = isActive;
+  });
+
   // Load extension on startup if enabled
   const enableExtension = store.get('enableExtension', false);
   if (enableExtension && fs.existsSync(EXTENSION_DIR)) {
@@ -466,239 +699,6 @@ app.whenReady().then(async () => {
   }
 
   createWindow();
-});
-
-// Other IPC Handlers
-ipcMain.on('open-settings', () => {
-  if (currentView !== 'settings') {
-    previousView = currentView;
-    settingsView.webContents.reload();
-    showTab('settings');
-    showKeyboardView();
-    autoCloseEnabled = false;
-  }
-});
-
-ipcMain.on('switch-tab', (ev, tab) => {
-  if (tab && views[tab]) {
-    if (currentView === 'settings' && tab !== 'settings') {
-      applySettings();
-      hideKeyboardView();
-      autoCloseEnabled = true;
-    }
-    showTab(tab);
-  }
-});
-
-ipcMain.on('refresh', () => {
-  const view = (currentView === 'settings') ? settingsView : views[currentView];
-  if (view) view.webContents.reload();
-});
-
-ipcMain.on('force-reload', () => {
-  const view = views[currentView];
-  if (view) {
-    const tabs = store.get('tabs', []);
-    const tabIndex = parseInt(currentView.replace('tab', ''), 10);
-    if (tabs[tabIndex] && tabs[tabIndex].url) view.webContents.loadURL(tabs[tabIndex].url);
-  }
-});
-
-ipcMain.on('toggle-webkeyboard', () => {
-  if (currentView === 'settings') showKeyboardView(); else toggleKeyboardView();
-});
-
-ipcMain.on('open-power-menu', () => {
-  if (mainWindow && powerMenuView && !powerMenuView.webContents.isDestroyed()) {
-    const [w, h] = mainWindow.getSize();
-    powerMenuView.setBounds({ x: 0, y: 0, width: w, height: h });
-    mainWindow.setTopBrowserView(powerMenuView);
-  }
-});
-
-ipcMain.on('close-power-menu', () => {
-  if (mainWindow && powerMenuView && !powerMenuView.webContents.isDestroyed()) {
-    const [w, h] = mainWindow.getSize();
-    powerMenuView.setBounds({ x: 0, y: h, width: w, height: h });
-  }
-});
-
-ipcMain.on('power-control', (event, action) => {
-  switch (action) {
-    case 'shutdown': exec('shutdown -h now', (err) => { if (err) log.error('Shutdown command failed:', err); }); break;
-    case 'restart': exec('reboot', (err) => { if (err) log.error('Restart command failed:', err); }); break;
-    case 'close-app': app.quit(); break;
-  }
-});
-
-ipcMain.handle('get-keyboard-layouts', async () => {
-  const layoutDir = path.join(__dirname, 'keyboard', 'layouts');
-  try {
-    const files = await fs.promises.readdir(layoutDir);
-    return files.filter(file => file.endsWith('.js')).map(file => file.replace('.js', ''));
-  } catch (error) {
-    log.error(`FATAL: Could not read keyboard layouts from ${layoutDir}.`, error);
-    return [];
-  }
-});
-
-ipcMain.handle('get-keyboard-layout-data', async (event, layoutName) => {
-  const requestedLayout = (layoutName || '').toLowerCase();
-  if (!requestedLayout) { log.error('Request for invalid or empty layout name rejected.'); return null; }
-  const layoutDir = path.join(__dirname, 'keyboard', 'layouts');
-  try {
-    const files = await fs.promises.readdir(layoutDir);
-    const targetFile = files.find(file => path.basename(file, '.js').toLowerCase() === requestedLayout);
-    if (!targetFile) { log.error(`Layout file not found for '${layoutName}' in directory ${layoutDir}`); return null; }
-    const layoutPath = path.join(layoutDir, targetFile);
-    const layoutData = require(layoutPath);
-    delete require.cache[require.resolve(layoutPath)];
-    return layoutData;
-  } catch (error) {
-    log.error(`FATAL: Could not load layout module for '${layoutName}'.`, error);
-    return null;
-  }
-});
-
-ipcMain.handle('get-settings', async () => {
-  return {
-    volume: store.get('volume', 50),
-    keyboardWidth: store.get('keyboard.width', 100),
-    keyHeight: store.get('keyboard.keyHeight', 50),
-    keyboardLayout: store.get('keyboard.layout', 'de'),
-    enableExtension: store.get('enableExtension', false),
-    tabs: store.get('tabs', [
-      { name: 'Autodarts', url: 'https://play.autodarts.io/' },
-      { name: 'Service', url: 'http://localhost:3180/' }
-    ])
-  };
-});
-
-ipcMain.on('save-settings', async (event, settings) => {
-  log.info('Saving settings...');
-  const oldEnableExtension = store.get('enableExtension', false);
-  store.set(settings);
-  if (oldEnableExtension !== settings.enableExtension) {
-    if (settings.enableExtension) {
-      if (!autodartsToolsExtensionId && fs.existsSync(EXTENSION_DIR)) {
-        try {
-          const extension = await session.defaultSession.loadExtension(EXTENSION_DIR, { allowFileAccess: true });
-          autodartsToolsExtensionId = extension.id;
-          log.info('Autodarts Tools extension dynamically loaded.');
-        } catch (error) {
-          log.error('Failed to dynamically load extension:', error);
-        }
-      }
-    } else {
-      if (autodartsToolsExtensionId) {
-        try {
-          await session.defaultSession.removeExtension(autodartsToolsExtensionId);
-          log.info('Autodarts Tools extension dynamically unloaded.');
-          autodartsToolsExtensionId = null;
-        } catch (error) {
-          log.error('Failed to dynamically unload extension:', error);
-        }
-      }
-    }
-  }
-  applySettings();
-  setTimeout(async () => {
-    await reloadDynamicViews();
-    if (previousView && views[previousView]) showTab(previousView);
-    else showTab(Object.keys(views).find(k => k.startsWith('tab')) || null);
-    previousView = null;
-    autoCloseEnabled = true;
-    log.info('Settings saved and dynamic views reloaded successfully.');
-  }, 100);
-  hideKeyboardView();
-});
-
-ipcMain.on('set-cursor-visibility', (event, visible) => {
-    const css = `* { cursor: ${visible ? 'default' : 'none'} !important; }`;
-    const allViews = [...Object.values(views), toolbarView, settingsView, keyboardView, powerMenuView];
-    allViews.forEach(view => {
-        if (view && view.webContents && !view.webContents.isDestroyed()) {
-            view.webContents.insertCSS(css).catch(e => log.error(`Failed to set cursor visibility for a view: ${e}`));
-        }
-    });
-});
-
-ipcMain.handle('get-tabs', async () => store.get('tabs', [ { name: 'Autodarts', url: 'https://play.autodarts.io/' }, { name: 'Service', url: 'http://localhost:3180/' } ]));
-ipcMain.handle('get-current-view', () => currentView);
-ipcMain.on('close-settings', () => {
-  applySettings();
-  if (previousView) showTab(previousView);
-  hideKeyboardView();
-  autoCloseEnabled = true;
-});
-
-ipcMain.on('update-keyboard-style-live', (event, style) => applyKeyboardStyle(style));
-ipcMain.on('keyboard-height-changed', (event, height) => {
-  if (height && height > 100) {
-    if (keyboardActualHeight !== height) {
-      log.info(`IPC: Keyboard height updated to ${height}px`);
-      keyboardActualHeight = height;
-      if (keyboardVisible) {
-        updateKeyboardBounds();
-        updateMainViewBounds();
-      }
-    }
-  } else {
-    log.warn(`IPC: Received invalid keyboard height: ${height}px. Using fallback.`);
-    keyboardActualHeight = 250;
-    if (keyboardVisible) {
-      updateKeyboardBounds();
-      updateMainViewBounds();
-    }
-  }
-});
-ipcMain.on('input-focused', (event, viewName) => {
-  log.info(`[FOCUS_DEBUG] Main process received 'input-focused' from view: ${viewName}.`);
-  if (!keyboardVisible) {
-    log.info('[FOCUS_DEBUG] Keyboard not visible, showing it now.');
-    showKeyboardView();
-  }
-});
-
-ipcMain.on('input-blurred', (event, viewName) => {
-  log.info(`[FOCUS_DEBUG] Main process received 'input-blurred' from view: ${viewName}.`);
-  if (keyboardVisible && autoCloseEnabled) {
-    log.info('[FOCUS_DEBUG] Keyboard is visible and auto-close is enabled. Hiding keyboard after delay.');
-    setTimeout(() => {
-      if (keyboardVisible && autoCloseEnabled) {
-        log.info('[FOCUS_DEBUG] Auto-hiding keyboard now.');
-        hideKeyboardView();
-      }
-    }, 300);
-  }
-});
-
-ipcMain.on('webkeyboard-key', (ev, key) => {
-  const targetView = (currentView === 'settings') ? settingsView : views[currentView];
-  if (!targetView || !targetView.webContents || targetView.webContents.isDestroyed()) {
-    log.error(`Cannot send key to invalid or destroyed view: ${currentView}`);
-    return;
-  }
-  if (key === '{bksp}') {
-    targetView.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Backspace' });
-    targetView.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Backspace' });
-  } else if (key === '{enter}') {
-    targetView.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Enter' });
-    targetView.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Enter' });
-  } else if (key === '{space}' || key === ' ') {
-    targetView.webContents.sendInputEvent({ type: 'char', keyCode: ' ' });
-  } else if (key === '{tab}') {
-    targetView.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Tab' });
-    targetView.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Tab' });
-  } else if (key === '{shift}' || key === '{capslock}') {
-    shiftActive = !shiftActive;
-  } else {
-    targetView.webContents.sendInputEvent({ type: 'char', keyCode: key });
-  }
-});
-
-ipcMain.on('keyboard-shift-status', (ev, isActive) => {
-  shiftActive = isActive;
 });
 
 app.on('window-all-closed', () => app.quit());
