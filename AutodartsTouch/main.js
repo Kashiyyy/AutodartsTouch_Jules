@@ -400,7 +400,8 @@ function setupAutoKeyboard() {
 // This is the main entry point.
 app.whenReady().then(async () => {
   // Initialize paths now that app is ready
-  EXTENSION_DIR = path.join(__dirname, 'extensions');
+  const extensionName = GITHUB_REPO.split('/')[1];
+  EXTENSION_DIR = path.join(__dirname, 'extensions', extensionName);
   log.transports.file.resolvePath = (vars) => {
     const logPath = store.get('logPath');
     if (logPath) {
