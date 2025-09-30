@@ -312,8 +312,8 @@
     function sendLiveToolbarUpdate() {
       if (window.electronAPI && window.electronAPI.updateToolbarStyleLive) {
         const style = {
-          height: toolbarHeightSlider.value,
-          fontSize: toolbarFontSizeSlider.value,
+          height: parseInt(toolbarHeightSlider.value, 10),
+          fontSize: parseInt(toolbarFontSizeSlider.value, 10),
         };
         window.electronAPI.updateToolbarStyleLive(style);
       }
@@ -409,8 +409,8 @@
     keyboardWidthSlider.addEventListener('change', sendLiveUpdate);
     keyHeightSlider.addEventListener('change', sendLiveUpdate);
     keyboardLayoutSelect.addEventListener('change', sendLiveUpdate);
-    toolbarHeightSlider.addEventListener('change', sendLiveToolbarUpdate);
-    toolbarFontSizeSlider.addEventListener('change', sendLiveToolbarUpdate);
+    toolbarHeightSlider.addEventListener('input', sendLiveToolbarUpdate);
+    toolbarFontSizeSlider.addEventListener('input', sendLiveToolbarUpdate);
 
     enableExtensionCheckbox.addEventListener('change', () => {
       const isEnabled = enableExtensionCheckbox.checked;
@@ -458,12 +458,12 @@
       }
 
       const settings = {
-        volume: volumeSlider.value,
-        keyboardWidth: keyboardWidthSlider.value,
-        keyHeight: keyHeightSlider.value,
+        volume: parseInt(volumeSlider.value, 10),
+        keyboardWidth: parseInt(keyboardWidthSlider.value, 10),
+        keyHeight: parseInt(keyHeightSlider.value, 10),
         keyboardLayout: keyboardLayoutSelect.value,
-        toolbarHeight: toolbarHeightSlider.value,
-        toolbarFontSize: toolbarFontSizeSlider.value,
+        toolbarHeight: parseInt(toolbarHeightSlider.value, 10),
+        toolbarFontSize: parseInt(toolbarFontSizeSlider.value, 10),
         tabs: tabs,
         enableExtension: enableExtensionCheckbox.checked,
       };

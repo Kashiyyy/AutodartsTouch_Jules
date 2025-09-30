@@ -354,7 +354,7 @@ function applySettings() {
 
 function applyToolbarStyle(style) {
   const height = style ? style.height : store.get('toolbar.height', 72);
-  toolbarHeight = height; // Update global variable
+  toolbarHeight = height;
   const fontSize = style ? style.fontSize : store.get('toolbar.fontSize', 24);
   if (toolbarView && toolbarView.webContents) {
     const sendStyle = () => toolbarView.webContents.send('update-toolbar-style', { height, fontSize });
@@ -574,7 +574,6 @@ app.whenReady().then(async () => {
     console.log('Saving settings...');
     const oldEnableExtension = store.get('enableExtension', false);
 
-    // Store toolbar settings in a nested object
     store.set('volume', settings.volume);
     store.set('keyboard.width', settings.keyboardWidth);
     store.set('keyboard.keyHeight', settings.keyHeight);
@@ -641,7 +640,7 @@ app.whenReady().then(async () => {
   ipcMain.on('update-keyboard-style-live', (event, style) => applyKeyboardStyle(style));
   ipcMain.on('update-toolbar-style-live', (event, style) => {
     applyToolbarStyle(style);
-    showTab(currentView); // Re-calculate bounds with new toolbar height
+    showTab(currentView);
   });
   ipcMain.on('keyboard-height-changed', (event, height) => {
     if (height && height > 100) {
