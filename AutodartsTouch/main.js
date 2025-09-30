@@ -107,7 +107,7 @@ async function downloadAndInstallExtension(url, version) {
   }
 }
 
-const TOOLBAR_HEIGHT = 72;
+let toolbarHeight = 72;
 const KEYBOARD_HEIGHT = 300;
 let keyboardVisible = false;
 let shiftActive = false;
@@ -223,12 +223,13 @@ function showTab(tab) {
   if (!mainWindow) return;
   const [w, h] = mainWindow.getSize();
 
-  const availableHeight = h - TOOLBAR_HEIGHT - (keyboardVisible ? keyboardActualHeight : 0);
+  const currentToolbarHeight = store.get('toolbar.height', 72);
+  const availableHeight = h - currentToolbarHeight - (keyboardVisible ? keyboardActualHeight : 0);
 
   Object.keys(views).forEach(k => {
     const v = views[k];
     if (k === tab) {
-      v.setBounds({ x: 0, y: TOOLBAR_HEIGHT, width: w, height: availableHeight });
+      v.setBounds({ x: 0, y: currentToolbarHeight, width: w, height: availableHeight });
       v.setAutoResize({ width: true, height: true });
     } else {
       v.setBounds({ x: 0, y: h, width: w, height: availableHeight });
@@ -237,14 +238,16 @@ function showTab(tab) {
   });
 
   if (tab === 'settings') {
-    settingsView.setBounds({ x: 0, y: TOOLBAR_HEIGHT, width: w, height: availableHeight });
+    const currentToolbarHeight = store.get('toolbar.height', 72);
+    settingsView.setBounds({ x: 0, y: currentToolbarHeight, width: w, height: availableHeight });
     settingsView.setAutoResize({ width: true, height: true });
   } else {
     settingsView.setBounds({ x: 0, y: h, width: w, height: availableHeight });
   }
 
   try {
-    toolbarView.setBounds({ x: 0, y: 0, width: w, height: TOOLBAR_HEIGHT });
+    const currentToolbarHeight = store.get('toolbar.height', 72);
+    toolbarView.setBounds({ x: 0, y: 0, width: w, height: currentToolbarHeight });
     toolbarView.setAutoResize({ width: true });
   } catch (e) {
     console.error('Error setting toolbar bounds:', e);
@@ -267,8 +270,9 @@ function updateMainViewBounds() {
     console.error(`updateMainViewBounds: Cannot resize invalid or destroyed active view: ${currentView}`);
     return;
   }
-  const availableHeight = h - TOOLBAR_HEIGHT - (keyboardVisible ? keyboardActualHeight : 0);
-  activeView.setBounds({ x: 0, y: TOOLBAR_HEIGHT, width: w, height: availableHeight });
+  const currentToolbarHeight = store.get('toolbar.height', 72);
+  const availableHeight = h - currentToolbarHeight - (keyboardVisible ? keyboardActualHeight : 0);
+  activeView.setBounds({ x: 0, y: currentToolbarHeight, width: w, height: availableHeight });
 }
 
 function updateKeyboardBounds() {
@@ -345,6 +349,18 @@ function applySettings() {
     else console.log(`System volume set to ${volume}%`);
   });
   applyKeyboardStyle();
+  applyToolbarStyle();
+}
+
+function applyToolbarStyle(style) {
+  const height = style ? style.height : store.get('toolbar.height', 72);
+  toolbarHeight = height; // Update global variable
+  const fontSize = style ? style.fontSize : store.get('toolbar.fontSize', 24);
+  if (toolbarView && toolbarView.webContents) {
+    const sendStyle = () => toolbarView.webContents.send('update-toolbar-style', { height, fontSize });
+    if (toolbarView.webContents.isLoading()) toolbarView.webContents.once('dom-ready', sendStyle);
+    else sendStyle();
+  }
 }
 
 function applyKeyboardStyle(style) {
@@ -544,6 +560,8 @@ app.whenReady().then(async () => {
       keyboardWidth: store.get('keyboard.width', 100),
       keyHeight: store.get('keyboard.keyHeight', 50),
       keyboardLayout: store.get('keyboard.layout', 'de'),
+      toolbarHeight: store.get('toolbar.height', 72),
+      toolbarFontSize: store.get('toolbar.fontSize', 24),
       enableExtension: store.get('enableExtension', false),
       tabs: store.get('tabs', [
         { name: 'Autodarts', url: 'https://play.autodarts.io/' },
@@ -555,7 +573,17 @@ app.whenReady().then(async () => {
   ipcMain.on('save-settings', async (event, settings) => {
     console.log('Saving settings...');
     const oldEnableExtension = store.get('enableExtension', false);
-    store.set(settings);
+
+    // Store toolbar settings in a nested object
+    store.set('volume', settings.volume);
+    store.set('keyboard.width', settings.keyboardWidth);
+    store.set('keyboard.keyHeight', settings.keyHeight);
+    store.set('keyboard.layout', settings.keyboardLayout);
+    store.set('toolbar.height', settings.toolbarHeight);
+    store.set('toolbar.fontSize', settings.toolbarFontSize);
+    store.set('tabs', settings.tabs);
+    store.set('enableExtension', settings.enableExtension);
+
     if (oldEnableExtension !== settings.enableExtension) {
       if (settings.enableExtension) {
         if (!autodartsToolsExtensionId && fs.existsSync(EXTENSION_DIR)) {
@@ -611,6 +639,10 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.on('update-keyboard-style-live', (event, style) => applyKeyboardStyle(style));
+  ipcMain.on('update-toolbar-style-live', (event, style) => {
+    applyToolbarStyle(style);
+    showTab(currentView); // Re-calculate bounds with new toolbar height
+  });
   ipcMain.on('keyboard-height-changed', (event, height) => {
     if (height && height > 100) {
       if (keyboardActualHeight !== height) {

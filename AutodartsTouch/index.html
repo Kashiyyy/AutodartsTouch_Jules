@@ -104,6 +104,25 @@ button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 a
         console.log(`Toolbar received active-view-changed event: ${activeViewId}`);
         updateActiveTab();
       });
+
+      window.api.on('update-toolbar-style', ({ height, fontSize }) => {
+        const toolbar = document.getElementById('toolbar');
+        if (toolbar) {
+          toolbar.style.height = `${height}px`;
+        }
+
+        const buttons = document.querySelectorAll('#toolbar button');
+        buttons.forEach(button => {
+          button.style.fontSize = `${fontSize}px`;
+        });
+
+        const powerIcon = document.querySelector('#powerBtn svg');
+        if (powerIcon) {
+          const iconSize = Math.round(fontSize * 1.15);
+          powerIcon.setAttribute('height', `${iconSize}px`);
+          powerIcon.setAttribute('width', `${iconSize}px`);
+        }
+      });
     }
 
     const webVKBtn = document.getElementById('webVKBtn');

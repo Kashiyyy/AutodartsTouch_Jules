@@ -155,6 +155,16 @@
       <select id="keyboardLayout"></select>
     </div>
 
+    <div class="setting">
+      <label for="toolbarHeight">Toolbar Height (px)</label>
+      <input type="range" id="toolbarHeight" min="48" max="120" value="72">
+    </div>
+
+    <div class="setting">
+      <label for="toolbarFontSize">Toolbar Font/Icon Size (px)</label>
+      <input type="range" id="toolbarFontSize" min="16" max="40" value="24">
+    </div>
+
     <div class="extension-settings">
         <h2>Autodarts Tools Extension</h2>
         <div class="setting">
@@ -258,6 +268,8 @@
     const keyboardWidthSlider = document.getElementById('keyboardWidth');
     const keyHeightSlider = document.getElementById('keyHeight');
     const keyboardLayoutSelect = document.getElementById('keyboardLayout');
+    const toolbarHeightSlider = document.getElementById('toolbarHeight');
+    const toolbarFontSizeSlider = document.getElementById('toolbarFontSize');
     const saveBtn = document.getElementById('saveBtn');
     const closeBtn = document.getElementById('closeBtn');
 
@@ -294,6 +306,16 @@
           layout: keyboardLayoutSelect.value,
         };
         window.electronAPI.updateKeyboardStyleLive(style);
+      }
+    }
+
+    function sendLiveToolbarUpdate() {
+      if (window.electronAPI && window.electronAPI.updateToolbarStyleLive) {
+        const style = {
+          height: toolbarHeightSlider.value,
+          fontSize: toolbarFontSizeSlider.value,
+        };
+        window.electronAPI.updateToolbarStyleLive(style);
       }
     }
 
@@ -361,6 +383,8 @@
           keyboardWidthSlider.value = settings.keyboardWidth || 100;
           keyHeightSlider.value = settings.keyHeight || 50;
           keyboardLayoutSelect.value = settings.keyboardLayout || 'de';
+          toolbarHeightSlider.value = settings.toolbarHeight || 72;
+          toolbarFontSizeSlider.value = settings.toolbarFontSize || 24;
           enableExtensionCheckbox.checked = settings.enableExtension || false;
 
           if (settings.tabs) {
@@ -385,6 +409,8 @@
     keyboardWidthSlider.addEventListener('change', sendLiveUpdate);
     keyHeightSlider.addEventListener('change', sendLiveUpdate);
     keyboardLayoutSelect.addEventListener('change', sendLiveUpdate);
+    toolbarHeightSlider.addEventListener('change', sendLiveToolbarUpdate);
+    toolbarFontSizeSlider.addEventListener('change', sendLiveToolbarUpdate);
 
     enableExtensionCheckbox.addEventListener('change', () => {
       const isEnabled = enableExtensionCheckbox.checked;
@@ -436,6 +462,8 @@
         keyboardWidth: keyboardWidthSlider.value,
         keyHeight: keyHeightSlider.value,
         keyboardLayout: keyboardLayoutSelect.value,
+        toolbarHeight: toolbarHeightSlider.value,
+        toolbarFontSize: toolbarFontSizeSlider.value,
         tabs: tabs,
         enableExtension: enableExtensionCheckbox.checked,
       };
