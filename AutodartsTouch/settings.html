@@ -91,6 +91,12 @@
     #download-extension-btn:hover {
         background-color: #4cae4c;
     }
+    #view-logs-btn {
+        background-color: #6c757d;
+    }
+    #view-logs-btn:hover {
+        background-color: #5a6268;
+    }
 
     /* Toggle switch styles */
     .switch {
@@ -166,10 +172,12 @@
             </label>
         </div>
         <div id="extension-status" style="display: none;">
-            <p>Installed Version: <span id="installed-version">Not installed</span></p>
+            <p>Installed Version: <span id="installed-version">Checking...</span></p>
             <p>Latest Version: <span id="latest-version">Checking...</span></p>
+            <p>Status: <span id="extension-message" style="color: #f0ad4e;"></span></p>
             <button id="update-extension-btn" style="display: none;">Update Available</button>
             <button id="download-extension-btn" style="display: none;">Download & Install</button>
+            <button id="view-logs-btn">View Logs</button>
         </div>
     </div>
 
@@ -266,8 +274,10 @@
     const extensionStatusDiv = document.getElementById('extension-status');
     const installedVersionSpan = document.getElementById('installed-version');
     const latestVersionSpan = document.getElementById('latest-version');
+    const extensionMessageSpan = document.getElementById('extension-message');
     const updateExtensionBtn = document.getElementById('update-extension-btn');
     const downloadExtensionBtn = document.getElementById('download-extension-btn');
+    const viewLogsBtn = document.getElementById('view-logs-btn');
 
     const tabNameInputs = [
       document.getElementById('tabName1'),
@@ -296,30 +306,53 @@
       }
     }
 
+    function setStatusMessage(message, isError = false) {
+        extensionMessageSpan.textContent = message;
+        extensionMessageSpan.style.color = isError ? '#ff6b6b' : '#f0ad4e';
+    }
+
     async function updateExtensionStatus() {
-      if (!window.electronAPI || !window.electronAPI.getExtensionVersions) return;
+        if (!window.electronAPI || !window.electronAPI.getExtensionVersions) return;
 
-      const versions = await window.electronAPI.getExtensionVersions();
-      installedVersionSpan.textContent = versions.installed || 'Not installed';
-      latestVersionSpan.textContent = versions.latest || 'Could not fetch';
+        setStatusMessage('Checking for updates...');
+        const versions = await window.electronAPI.getExtensionVersions();
 
-      downloadExtensionBtn.style.display = 'none';
-      updateExtensionBtn.style.display = 'none';
-
-      if (versions.latest) {
-        if (!versions.installed) {
-          downloadExtensionBtn.style.display = 'block';
-        } else if (versions.installed && versions.latest && versions.isUpdateAvailable) {
-          updateExtensionBtn.textContent = `Update to ${versions.latest}`;
-          updateExtensionBtn.style.display = 'block';
+        if (versions.error) {
+            setStatusMessage(`Error: ${versions.error}`, true);
+            installedVersionSpan.textContent = 'Unknown';
+            latestVersionSpan.textContent = 'Unknown';
+            return;
         }
-      }
+
+        installedVersionSpan.textContent = versions.installed || 'Not installed';
+        latestVersionSpan.textContent = versions.latest || 'Could not fetch';
+
+        downloadExtensionBtn.style.display = 'none';
+        updateExtensionBtn.style.display = 'none';
+        downloadExtensionBtn.disabled = false;
+        updateExtensionBtn.disabled = false;
+        downloadExtensionBtn.textContent = 'Download & Install';
+        updateExtensionBtn.textContent = 'Update Available';
+
+        if (versions.latest) {
+            if (!versions.installed) {
+                downloadExtensionBtn.style.display = 'inline-block';
+                setStatusMessage('Extension not installed.');
+            } else if (versions.isUpdateAvailable) {
+                updateExtensionBtn.textContent = `Update to ${versions.latest}`;
+                updateExtensionBtn.style.display = 'inline-block';
+                setStatusMessage('An update is available.');
+            } else {
+                setStatusMessage('You have the latest version.');
+            }
+        } else {
+            setStatusMessage('Could not verify latest version.', true);
+        }
     }
 
     async function loadInitialData() {
       if (!window.electronAPI) return;
 
-      // First, populate the layout dropdown
       if (window.electronAPI.getKeyboardLayouts) {
         const layouts = await window.electronAPI.getKeyboardLayouts();
         layouts.forEach(layout => {
@@ -330,7 +363,6 @@
         });
       }
 
-      // Then, load all saved settings
       if (window.electronAPI.getSettings) {
         const settings = await window.electronAPI.getSettings();
         if (settings) {
@@ -338,18 +370,19 @@
           keyboardWidthSlider.value = settings.keyboardWidth || 100;
           keyHeightSlider.value = settings.keyHeight || 50;
           keyboardLayoutSelect.value = settings.keyboardLayout || 'de';
+          enableExtensionCheckbox.checked = settings.enableExtension || false;
+
           if (settings.tabs) {
             settings.tabs.forEach((tab, index) => {
               if (tabNameInputs[index]) tabNameInputs[index].value = tab.name;
               if (tabUrlInputs[index]) tabUrlInputs[index].value = tab.url;
             });
           }
-          if (settings.enableExtension) {
-            enableExtensionCheckbox.checked = true;
+
+          if (enableExtensionCheckbox.checked) {
             extensionStatusDiv.style.display = 'block';
             updateExtensionStatus();
           } else {
-            enableExtensionCheckbox.checked = false;
             extensionStatusDiv.style.display = 'none';
           }
         }
@@ -358,7 +391,6 @@
 
     loadInitialData();
 
-    // Add listeners for live-updates
     keyboardWidthSlider.addEventListener('change', sendLiveUpdate);
     keyHeightSlider.addEventListener('change', sendLiveUpdate);
     keyboardLayoutSelect.addEventListener('change', sendLiveUpdate);
@@ -371,34 +403,34 @@
       }
     });
 
-    downloadExtensionBtn.addEventListener('click', async () => {
-      if (window.electronAPI && window.electronAPI.downloadExtension) {
-        downloadExtensionBtn.textContent = 'Downloading...';
-        downloadExtensionBtn.disabled = true;
-        const success = await window.electronAPI.downloadExtension();
-        if (success) {
-          downloadExtensionBtn.textContent = 'Downloaded!';
-          setTimeout(updateExtensionStatus, 1000);
-        } else {
-          downloadExtensionBtn.textContent = 'Download Failed';
-          downloadExtensionBtn.disabled = false;
-        }
-      }
-    });
+    async function handleDownload(button) {
+        if (!window.electronAPI || !window.electronAPI.downloadExtension) return;
 
-    updateExtensionBtn.addEventListener('click', async () => {
-      if (window.electronAPI && window.electronAPI.downloadExtension) {
-        updateExtensionBtn.textContent = 'Updating...';
-        updateExtensionBtn.disabled = true;
-        const success = await window.electronAPI.downloadExtension();
-        if (success) {
-          updateExtensionBtn.textContent = 'Updated!';
-          setTimeout(updateExtensionStatus, 1000);
+        button.textContent = 'Working...';
+        button.disabled = true;
+        setStatusMessage('Downloading and installing, please wait...');
+
+        const result = await window.electronAPI.downloadExtension();
+
+        if (result.success) {
+            setStatusMessage('Operation successful! Reloading status...');
+            setTimeout(updateExtensionStatus, 1000);
         } else {
-          updateExtensionBtn.textContent = 'Update Failed';
-          updateExtensionBtn.disabled = false;
+            setStatusMessage(result.error || 'An unknown error occurred.', true);
+            button.textContent = 'Action Failed';
+            setTimeout(() => {
+                button.disabled = false;
+                updateExtensionStatus();
+            }, 3000);
         }
-      }
+    }
+
+    downloadExtensionBtn.addEventListener('click', () => handleDownload(downloadExtensionBtn));
+    updateExtensionBtn.addEventListener('click', () => handleDownload(updateExtensionBtn));
+    viewLogsBtn.addEventListener('click', () => {
+        if(window.electronAPI && window.electronAPI.openLogFile) {
+            window.electronAPI.openLogFile();
+        }
     });
 
     saveBtn.addEventListener('click', () => {

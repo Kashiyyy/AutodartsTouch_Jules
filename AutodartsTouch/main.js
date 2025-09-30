@@ -1,4 +1,4 @@
-const { app, BrowserWindow, BrowserView, ipcMain, screen, session } = require('electron');
+const { app, BrowserWindow, BrowserView, ipcMain, screen, session, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const Store = require('electron-store');
@@ -25,6 +25,7 @@ const EXTENSION_DIR = path.join(__dirname, 'Extension');
 
 // Helper function to get latest release info (version and download URL)
 async function getLatestExtensionInfo() {
+  log.info('Fetching latest extension info...');
   try {
     const response = await axios.get(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`);
     const latestVersion = semver.clean(response.data.tag_name);
@@ -60,6 +61,7 @@ function getInstalledExtensionVersion() {
       return null;
     }
   }
+  log.info('Extension manifest not found. Extension is not installed.');
   return null;
 }
 
@@ -68,10 +70,11 @@ async function downloadAndInstallExtension(url, version) {
   log.info(`Downloading extension version ${version} from: ${url}`);
 
   try {
-    // Ensure the extension directory exists and is empty
     if (fs.existsSync(EXTENSION_DIR)) {
+      log.info(`Removing existing extension directory at: ${EXTENSION_DIR}`);
       fs.rmSync(EXTENSION_DIR, { recursive: true, force: true });
     }
+    log.info(`Creating new extension directory at: ${EXTENSION_DIR}`);
     fs.mkdirSync(EXTENSION_DIR);
 
     const response = await axios({
@@ -80,19 +83,25 @@ async function downloadAndInstallExtension(url, version) {
       responseType: 'stream'
     });
 
+    log.info('Download stream opened. Starting extraction...');
     const extraction = response.data.pipe(unzipper.Extract({ path: EXTENSION_DIR }));
 
     await new Promise((resolve, reject) => {
-      extraction.on('finish', resolve);
-      extraction.on('error', reject);
+      extraction.on('finish', () => {
+        log.info(`Extension version ${version} downloaded and extracted successfully.`);
+        resolve();
+      });
+      extraction.on('error', (err) => {
+        log.error('An error occurred during extraction:', err);
+        reject(err);
+      });
     });
 
-    log.info(`Extension version ${version} downloaded and extracted successfully.`);
     return true;
   } catch (error) {
     log.error(`Failed to download or extract extension: ${error.message}`);
-    // Clean up failed download
     if (fs.existsSync(EXTENSION_DIR)) {
+      log.info('Cleaning up failed installation attempt.');
       fs.rmSync(EXTENSION_DIR, { recursive: true, force: true });
     }
     return false;
@@ -612,21 +621,55 @@ ipcMain.on('close-power-menu', () => {
     }
 });
 
-
 ipcMain.handle('getExtensionVersions', async () => {
-  const installed = getInstalledExtensionVersion();
-  const latestInfo = await getLatestExtensionInfo();
-  const latest = latestInfo ? latestInfo.version : null;
-  const isUpdateAvailable = installed && latest ? semver.gt(latest, installed) : false;
-  return { installed, latest, isUpdateAvailable };
+  log.info('IPC: getExtensionVersions called.');
+  try {
+    const installed = getInstalledExtensionVersion();
+    const latestInfo = await getLatestExtensionInfo();
+    if (!latestInfo) {
+      return { error: 'Could not fetch latest version info from GitHub.' };
+    }
+    const latest = latestInfo.version;
+    const isUpdateAvailable = installed && latest ? semver.gt(latest, installed) : false;
+    log.info(`IPC: getExtensionVersions returning: installed=${installed}, latest=${latest}, updateAvailable=${isUpdateAvailable}`);
+    return { installed, latest, isUpdateAvailable };
+  } catch (error) {
+    log.error('IPC: getExtensionVersions error:', error);
+    return { error: error.message };
+  }
 });
 
 ipcMain.handle('downloadExtension', async () => {
+  log.info('IPC: downloadExtension called.');
   const latestInfo = await getLatestExtensionInfo();
-  if (latestInfo) {
-    return await downloadAndInstallExtension(latestInfo.url, latestInfo.version);
+  if (latestInfo && latestInfo.url && latestInfo.version) {
+    const success = await downloadAndInstallExtension(latestInfo.url, latestInfo.version);
+    if (success) {
+      if (autodartsToolsExtensionId) {
+        await session.defaultSession.removeExtension(autodartsToolsExtensionId);
+        log.info('Removed old extension version to prepare for reload.');
+        autodartsToolsExtensionId = null;
+      }
+      if (store.get('enableExtension', false)) {
+        try {
+          const extension = await session.defaultSession.loadExtension(EXTENSION_DIR, { allowFileAccess: true });
+          autodartsToolsExtensionId = extension.id;
+          log.info('Successfully reloaded extension after download/update.');
+        } catch (error) {
+          log.error('Failed to reload extension after download/update:', error);
+        }
+      }
+    }
+    return { success };
   }
-  return false;
+  log.error('IPC: downloadExtension failed because latest info was not available.');
+  return { success: false, error: 'Could not get latest release information.' };
+});
+
+ipcMain.on('open-log-file', () => {
+  const logFilePath = log.transports.file.getFile().path;
+  log.info(`IPC: open-log-file called. Opening: ${logFilePath}`);
+  shell.showItemInFolder(logFilePath);
 });
 
 ipcMain.on('power-control', (event, action) => {
