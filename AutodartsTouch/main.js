@@ -6,7 +6,6 @@ const { exec } = require('child_process');
 const axios = require('axios');
 const unzipper = require('unzipper');
 const semver = require('semver');
-const log = require('electron-log');
 
 const store = new Store();
 
@@ -25,24 +24,24 @@ let EXTENSION_DIR; // Will be initialized once the app is ready
 
 // Helper function to get latest release info (version and download URL)
 async function getLatestExtensionInfo() {
-  log.info('Fetching latest extension info...');
+  console.log('Fetching latest extension info...');
   try {
     const response = await axios.get(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`);
     const latestVersion = semver.clean(response.data.tag_name);
     const chromeAsset = response.data.assets.find(asset => asset.name.endsWith('-chrome.zip'));
 
     if (!chromeAsset) {
-      log.error('Could not find Chrome asset in the latest release.');
+      console.error('Could not find Chrome asset in the latest release.');
       return null;
     }
 
-    log.info(`Latest extension version found: ${latestVersion} with URL: ${chromeAsset.browser_download_url}`);
+    console.log(`Latest extension version found: ${latestVersion} with URL: ${chromeAsset.browser_download_url}`);
     return {
       version: latestVersion,
       url: chromeAsset.browser_download_url,
     };
   } catch (error) {
-    log.error('Failed to fetch latest extension info:', error);
+    console.error('Failed to fetch latest extension info:', error);
     return null;
   }
 }
@@ -54,27 +53,27 @@ function getInstalledExtensionVersion() {
     try {
       const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
       const installedVersion = manifest.version;
-      log.info(`Found installed extension version: ${installedVersion}`);
+      console.log(`Found installed extension version: ${installedVersion}`);
       return semver.clean(installedVersion);
     } catch (error) {
-      log.error('Failed to read or parse installed extension manifest:', error);
+      console.error('Failed to read or parse installed extension manifest:', error);
       return null;
     }
   }
-  log.info('Extension manifest not found. Extension is not installed.');
+  console.log('Extension manifest not found. Extension is not installed.');
   return null;
 }
 
 // Helper function to download and extract the extension
 async function downloadAndInstallExtension(url, version) {
-  log.info(`Downloading extension version ${version} from: ${url}`);
+  console.log(`Downloading extension version ${version} from: ${url}`);
 
   try {
     if (fs.existsSync(EXTENSION_DIR)) {
-      log.info(`Removing existing extension directory at: ${EXTENSION_DIR}`);
+      console.log(`Removing existing extension directory at: ${EXTENSION_DIR}`);
       fs.rmSync(EXTENSION_DIR, { recursive: true, force: true });
     }
-    log.info(`Creating new extension directory at: ${EXTENSION_DIR}`);
+    console.log(`Creating new extension directory at: ${EXTENSION_DIR}`);
     fs.mkdirSync(EXTENSION_DIR, { recursive: true });
 
     const response = await axios({
@@ -83,25 +82,25 @@ async function downloadAndInstallExtension(url, version) {
       responseType: 'stream'
     });
 
-    log.info('Download stream opened. Starting extraction...');
+    console.log('Download stream opened. Starting extraction...');
     const extraction = response.data.pipe(unzipper.Extract({ path: EXTENSION_DIR }));
 
     await new Promise((resolve, reject) => {
       extraction.on('finish', () => {
-        log.info(`Extension version ${version} downloaded and extracted successfully.`);
+        console.log(`Extension version ${version} downloaded and extracted successfully.`);
         resolve();
       });
       extraction.on('error', (err) => {
-        log.error('An error occurred during extraction:', err);
+        console.error('An error occurred during extraction:', err);
         reject(err);
       });
     });
 
     return true;
   } catch (error) {
-    log.error(`Failed to download or extract extension: ${error}`);
+    console.error(`Failed to download or extract extension: ${error}`);
     if (fs.existsSync(EXTENSION_DIR)) {
-      log.info('Cleaning up failed installation attempt.');
+      console.log('Cleaning up failed installation attempt.');
       fs.rmSync(EXTENSION_DIR, { recursive: true, force: true });
     }
     return false;
@@ -163,7 +162,7 @@ function createDynamicViews() {
       const view = new BrowserView({ webPreferences: { contextIsolation: true, sandbox: false, preload: path.join(__dirname, 'preload.js') } });
       mainWindow.addBrowserView(view);
       views[`tab${index}`] = view;
-      loadingPromises.push(view.webContents.loadURL(tab.url).catch(e => log.error(`tab${index} load error:`, e)));
+      loadingPromises.push(view.webContents.loadURL(tab.url).catch(e => console.error(`tab${index} load error:`, e)));
     }
   });
 
@@ -180,11 +179,11 @@ function createDynamicViews() {
   mainWindow.addBrowserView(keyboardView);
   loadingPromises.push(keyboardView.webContents.loadFile(path.join(__dirname, 'keyboard', 'index.html')));
 
-  return Promise.all(loadingPromises).catch(e => log.error('Error loading one or more dynamic views:', e));
+  return Promise.all(loadingPromises).catch(e => console.error('Error loading one or more dynamic views:', e));
 }
 
 async function reloadDynamicViews() {
-  log.info('Reloading dynamic views...');
+  console.log('Reloading dynamic views...');
   if (!mainWindow) return;
 
   const dynamicViews = [ ...Object.values(views), toolbarView, keyboardView ];
@@ -202,9 +201,9 @@ async function reloadDynamicViews() {
 
   try {
     await createDynamicViews();
-    log.info('Dynamic views finished loading.');
+    console.log('Dynamic views finished loading.');
   } catch (error) {
-    log.error('An error occurred during dynamic view reload:', error);
+    console.error('An error occurred during dynamic view reload:', error);
     return;
   }
 
@@ -217,7 +216,7 @@ async function reloadDynamicViews() {
     setupAutoKeyboard();
   }, 1000);
 
-  log.info('Dynamic views reloaded successfully.');
+  console.log('Dynamic views reloaded successfully.');
 }
 
 function showTab(tab) {
@@ -248,7 +247,7 @@ function showTab(tab) {
     toolbarView.setBounds({ x: 0, y: 0, width: w, height: TOOLBAR_HEIGHT });
     toolbarView.setAutoResize({ width: true });
   } catch (e) {
-    log.error('Error setting toolbar bounds:', e);
+    console.error('Error setting toolbar bounds:', e);
   }
 
   currentView = tab;
@@ -265,7 +264,7 @@ function updateMainViewBounds() {
   const [w, h] = mainWindow.getSize();
   const activeView = (currentView === 'settings') ? settingsView : views[currentView];
   if (!activeView || !activeView.webContents || activeView.webContents.isDestroyed()) {
-    log.error(`updateMainViewBounds: Cannot resize invalid or destroyed active view: ${currentView}`);
+    console.error(`updateMainViewBounds: Cannot resize invalid or destroyed active view: ${currentView}`);
     return;
   }
   const availableHeight = h - TOOLBAR_HEIGHT - (keyboardVisible ? keyboardActualHeight : 0);
@@ -281,9 +280,9 @@ function updateKeyboardBounds() {
 
 function showKeyboardView() {
   if (!keyboardVisible) {
-    log.info('Showing keyboard view');
+    console.log('Showing keyboard view');
     if (keyboardView && keyboardView.webContents) {
-      keyboardView.webContents.executeJavaScript('window.showKeyboard && window.showKeyboard()').catch(e => log.error('Failed to reset keyboard:', e));
+      keyboardView.webContents.executeJavaScript('window.showKeyboard && window.showKeyboard()').catch(e => console.error('Failed to reset keyboard:', e));
     }
     keyboardVisible = true;
     applyKeyboardStyle();
@@ -295,7 +294,7 @@ function showKeyboardView() {
 
 function hideKeyboardView() {
   if (keyboardVisible) {
-    log.info('Hiding keyboard view');
+    console.log('Hiding keyboard view');
     keyboardVisible = false;
     if (mainWindow && keyboardView) {
       const [w, h] = mainWindow.getSize();
@@ -325,7 +324,7 @@ function measureKeyboardHeight() {
         }
       }
     }).catch(e => {
-      log.error('Failed to measure keyboard height via JS, using fallback.', e);
+      console.error('Failed to measure keyboard height via JS, using fallback.', e);
       keyboardActualHeight = 250;
       if (keyboardVisible) {
         updateKeyboardBounds();
@@ -342,8 +341,8 @@ function toggleKeyboardView() {
 function applySettings() {
   const volume = store.get('volume', 50);
   exec(`amixer -D pulse sset Master ${volume}%`, (error) => {
-    if (error) log.error(`exec error: ${error}`);
-    else log.info(`System volume set to ${volume}%`);
+    if (error) console.error(`exec error: ${error}`);
+    else console.log(`System volume set to ${volume}%`);
   });
   applyKeyboardStyle();
 }
@@ -361,7 +360,7 @@ function applyKeyboardStyle(style) {
 
 function injectFocusDetector(view, viewName) {
   if (!view || !view.webContents || view.webContents.isDestroyed()) {
-    log.error(`[Debug] Skipping focus injection for invalid/destroyed view: ${viewName}`);
+    console.error(`[Debug] Skipping focus injection for invalid/destroyed view: ${viewName}`);
     return;
   }
   const script = `(function() {
@@ -386,7 +385,7 @@ function injectFocusDetector(view, viewName) {
       }, 100);
     }, true);
   })();`;
-  const doInjection = () => view.webContents.executeJavaScript(script).catch(err => log.error(`[Debug] FAILED to inject focus script into ${viewName}:`, err));
+  const doInjection = () => view.webContents.executeJavaScript(script).catch(err => console.error(`[Debug] FAILED to inject focus script into ${viewName}:`, err));
   if (view.webContents.isLoading()) view.webContents.once('dom-ready', doInjection);
   else doInjection();
 }
@@ -402,62 +401,49 @@ app.whenReady().then(async () => {
   // Initialize paths now that app is ready
   const extensionName = GITHUB_REPO.split('/')[1];
   EXTENSION_DIR = path.join(__dirname, 'extensions', extensionName);
-  log.transports.file.resolvePath = (vars) => {
-    const logPath = store.get('logPath');
-    if (logPath) {
-      return path.join(logPath, vars.fileName);
-    }
-    return path.join(app.getPath('userData'), 'logs', vars.fileName);
-  };
 
   // Register IPC Handlers that depend on app paths
   ipcMain.handle('getExtensionVersions', async () => {
-    log.info('IPC: getExtensionVersions called.');
+    console.log('IPC: getExtensionVersions called.');
     try {
       const installed = getInstalledExtensionVersion();
       const latestInfo = await getLatestExtensionInfo();
       if (!latestInfo) return { error: 'Could not fetch latest version info from GitHub.' };
       const latest = latestInfo.version;
       const isUpdateAvailable = installed && latest ? semver.gt(latest, installed) : false;
-      log.info(`IPC: getExtensionVersions returning: installed=${installed}, latest=${latest}, updateAvailable=${isUpdateAvailable}`);
+      console.log(`IPC: getExtensionVersions returning: installed=${installed}, latest=${latest}, updateAvailable=${isUpdateAvailable}`);
       return { installed, latest, isUpdateAvailable };
     } catch (error) {
-      log.error('IPC: getExtensionVersions error:', error);
+      console.error('IPC: getExtensionVersions error:', error);
       return { error: error.message };
     }
   });
 
   ipcMain.handle('downloadExtension', async () => {
-    log.info('IPC: downloadExtension called.');
+    console.log('IPC: downloadExtension called.');
     const latestInfo = await getLatestExtensionInfo();
     if (latestInfo && latestInfo.url && latestInfo.version) {
       const success = await downloadAndInstallExtension(latestInfo.url, latestInfo.version);
       if (success) {
         if (autodartsToolsExtensionId) {
           await session.defaultSession.removeExtension(autodartsToolsExtensionId);
-          log.info('Removed old extension version to prepare for reload.');
+          console.log('Removed old extension version to prepare for reload.');
           autodartsToolsExtensionId = null;
         }
         if (store.get('enableExtension', false)) {
           try {
             const extension = await session.defaultSession.loadExtension(EXTENSION_DIR, { allowFileAccess: true });
             autodartsToolsExtensionId = extension.id;
-            log.info('Successfully reloaded extension after download/update.');
+            console.log('Successfully reloaded extension after download/update.');
           } catch (error) {
-            log.error('Failed to reload extension after download/update:', error);
+            console.error('Failed to reload extension after download/update:', error);
           }
         }
       }
       return { success };
     }
-    log.error('IPC: downloadExtension failed because latest info was not available.');
+    console.error('IPC: downloadExtension failed because latest info was not available.');
     return { success: false, error: 'Could not get latest release information.' };
-  });
-
-  ipcMain.on('open-log-file', () => {
-    const logFilePath = log.transports.file.getFile().path;
-    log.info(`IPC: open-log-file called. Opening: ${logFilePath}`);
-    shell.showItemInFolder(logFilePath);
   });
 
   // Other IPC Handlers not dependent on app paths
@@ -517,8 +503,8 @@ app.whenReady().then(async () => {
 
   ipcMain.on('power-control', (event, action) => {
     switch (action) {
-      case 'shutdown': exec('shutdown -h now', (err) => { if (err) log.error('Shutdown command failed:', err); }); break;
-      case 'restart': exec('reboot', (err) => { if (err) log.error('Restart command failed:', err); }); break;
+      case 'shutdown': exec('shutdown -h now', (err) => { if (err) console.error('Shutdown command failed:', err); }); break;
+      case 'restart': exec('reboot', (err) => { if (err) console.error('Restart command failed:', err); }); break;
       case 'close-app': app.quit(); break;
     }
   });
@@ -529,25 +515,25 @@ app.whenReady().then(async () => {
       const files = await fs.promises.readdir(layoutDir);
       return files.filter(file => file.endsWith('.js')).map(file => file.replace('.js', ''));
     } catch (error) {
-      log.error(`FATAL: Could not read keyboard layouts from ${layoutDir}.`, error);
+      console.error(`FATAL: Could not read keyboard layouts from ${layoutDir}.`, error);
       return [];
     }
   });
 
   ipcMain.handle('get-keyboard-layout-data', async (event, layoutName) => {
     const requestedLayout = (layoutName || '').toLowerCase();
-    if (!requestedLayout) { log.error('Request for invalid or empty layout name rejected.'); return null; }
+    if (!requestedLayout) { console.error('Request for invalid or empty layout name rejected.'); return null; }
     const layoutDir = path.join(__dirname, 'keyboard', 'layouts');
     try {
       const files = await fs.promises.readdir(layoutDir);
       const targetFile = files.find(file => path.basename(file, '.js').toLowerCase() === requestedLayout);
-      if (!targetFile) { log.error(`Layout file not found for '${layoutName}' in directory ${layoutDir}`); return null; }
+      if (!targetFile) { console.error(`Layout file not found for '${layoutName}' in directory ${layoutDir}`); return null; }
       const layoutPath = path.join(layoutDir, targetFile);
       const layoutData = require(layoutPath);
       delete require.cache[require.resolve(layoutPath)];
       return layoutData;
     } catch (error) {
-      log.error(`FATAL: Could not load layout module for '${layoutName}'.`, error);
+      console.error(`FATAL: Could not load layout module for '${layoutName}'.`, error);
       return null;
     }
   });
@@ -567,7 +553,7 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.on('save-settings', async (event, settings) => {
-    log.info('Saving settings...');
+    console.log('Saving settings...');
     const oldEnableExtension = store.get('enableExtension', false);
     store.set(settings);
     if (oldEnableExtension !== settings.enableExtension) {
@@ -576,19 +562,19 @@ app.whenReady().then(async () => {
           try {
             const extension = await session.defaultSession.loadExtension(EXTENSION_DIR, { allowFileAccess: true });
             autodartsToolsExtensionId = extension.id;
-            log.info('Autodarts Tools extension dynamically loaded.');
+            console.log('Autodarts Tools extension dynamically loaded.');
           } catch (error) {
-            log.error('Failed to dynamically load extension:', error);
+            console.error('Failed to dynamically load extension:', error);
           }
         }
       } else {
         if (autodartsToolsExtensionId) {
           try {
             await session.defaultSession.removeExtension(autodartsToolsExtensionId);
-            log.info('Autodarts Tools extension dynamically unloaded.');
+            console.log('Autodarts Tools extension dynamically unloaded.');
             autodartsToolsExtensionId = null;
           } catch (error) {
-            log.error('Failed to dynamically unload extension:', error);
+            console.error('Failed to dynamically unload extension:', error);
           }
         }
       }
@@ -600,7 +586,7 @@ app.whenReady().then(async () => {
       else showTab(Object.keys(views).find(k => k.startsWith('tab')) || null);
       previousView = null;
       autoCloseEnabled = true;
-      log.info('Settings saved and dynamic views reloaded successfully.');
+      console.log('Settings saved and dynamic views reloaded successfully.');
     }, 100);
     hideKeyboardView();
   });
@@ -610,7 +596,7 @@ app.whenReady().then(async () => {
       const allViews = [...Object.values(views), toolbarView, settingsView, keyboardView, powerMenuView];
       allViews.forEach(view => {
           if (view && view.webContents && !view.webContents.isDestroyed()) {
-              view.webContents.insertCSS(css).catch(e => log.error(`Failed to set cursor visibility for a view: ${e}`));
+              view.webContents.insertCSS(css).catch(e => console.error(`Failed to set cursor visibility for a view: ${e}`));
           }
       });
   });
@@ -628,7 +614,7 @@ app.whenReady().then(async () => {
   ipcMain.on('keyboard-height-changed', (event, height) => {
     if (height && height > 100) {
       if (keyboardActualHeight !== height) {
-        log.info(`IPC: Keyboard height updated to ${height}px`);
+        console.log(`IPC: Keyboard height updated to ${height}px`);
         keyboardActualHeight = height;
         if (keyboardVisible) {
           updateKeyboardBounds();
@@ -636,7 +622,7 @@ app.whenReady().then(async () => {
         }
       }
     } else {
-      log.warn(`IPC: Received invalid keyboard height: ${height}px. Using fallback.`);
+      console.warn(`IPC: Received invalid keyboard height: ${height}px. Using fallback.`);
       keyboardActualHeight = 250;
       if (keyboardVisible) {
         updateKeyboardBounds();
@@ -645,20 +631,20 @@ app.whenReady().then(async () => {
     }
   });
   ipcMain.on('input-focused', (event, viewName) => {
-    log.info(`[FOCUS_DEBUG] Main process received 'input-focused' from view: ${viewName}.`);
+    console.log(`[FOCUS_DEBUG] Main process received 'input-focused' from view: ${viewName}.`);
     if (!keyboardVisible) {
-      log.info('[FOCUS_DEBUG] Keyboard not visible, showing it now.');
+      console.log('[FOCUS_DEBUG] Keyboard not visible, showing it now.');
       showKeyboardView();
     }
   });
 
   ipcMain.on('input-blurred', (event, viewName) => {
-    log.info(`[FOCUS_DEBUG] Main process received 'input-blurred' from view: ${viewName}.`);
+    console.log(`[FOCUS_DEBUG] Main process received 'input-blurred' from view: ${viewName}.`);
     if (keyboardVisible && autoCloseEnabled) {
-      log.info('[FOCUS_DEBUG] Keyboard is visible and auto-close is enabled. Hiding keyboard after delay.');
+      console.log('[FOCUS_DEBUG] Keyboard is visible and auto-close is enabled. Hiding keyboard after delay.');
       setTimeout(() => {
         if (keyboardVisible && autoCloseEnabled) {
-          log.info('[FOCUS_DEBUG] Auto-hiding keyboard now.');
+          console.log('[FOCUS_DEBUG] Auto-hiding keyboard now.');
           hideKeyboardView();
         }
       }, 300);
@@ -668,7 +654,7 @@ app.whenReady().then(async () => {
   ipcMain.on('webkeyboard-key', (ev, key) => {
     const targetView = (currentView === 'settings') ? settingsView : views[currentView];
     if (!targetView || !targetView.webContents || targetView.webContents.isDestroyed()) {
-      log.error(`Cannot send key to invalid or destroyed view: ${currentView}`);
+      console.error(`Cannot send key to invalid or destroyed view: ${currentView}`);
       return;
     }
     if (key === '{bksp}') {
@@ -680,7 +666,7 @@ app.whenReady().then(async () => {
     } else if (key === '{space}' || key === ' ') {
       targetView.webContents.sendInputEvent({ type: 'char', keyCode: ' ' });
     } else if (key === '{tab}') {
-      targetView.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Tab' });
+      targetView.webContents.sendInputEvent({ type: 'keyDown',keyCode: 'Tab' });
       targetView.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Tab' });
     } else if (key === '{shift}' || key === '{capslock}') {
       shiftActive = !shiftActive;
@@ -699,9 +685,9 @@ app.whenReady().then(async () => {
     try {
       const extension = await session.defaultSession.loadExtension(EXTENSION_DIR, { allowFileAccess: true });
       autodartsToolsExtensionId = extension.id;
-      log.info('Autodarts Tools extension loaded successfully on startup.');
+      console.log('Autodarts Tools extension loaded successfully on startup.');
     } catch (error) {
-      log.error('Failed to load Autodarts Tools extension on startup:', error);
+      console.error('Failed to load Autodarts Tools extension on startup:', error);
     }
   }
 
