@@ -64,6 +64,45 @@
     button:hover { background-color: #606062; }
     #saveBtn { background-color: #0066cc; }
     #saveBtn:hover { background-color: #0077dd; }
+
+    /* Toggle switch styles */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 60px;
+      height: 34px;
+      vertical-align: middle;
+      margin-left: 15px;
+    }
+    .switch input { display: none; }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #444;
+      transition: .4s;
+      border-radius: 34px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 26px;
+      width: 26px;
+      left: 4px;
+      bottom: 4px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+    input:checked + .slider {
+      background-color: #0066cc;
+    }
+    input:checked + .slider:before {
+      transform: translateX(26px);
+    }
   </style>
 </head>
 <body>
@@ -73,6 +112,14 @@
     <div class="setting">
       <label for="volume">System Volume</label>
       <input type="range" id="volume" min="0" max="100" value="50">
+    </div>
+
+    <div class="setting">
+      <label for="enableExtension" style="display: inline-block;">Enable Autodarts Tools Extension</label>
+      <label class="switch">
+        <input type="checkbox" id="enableExtension">
+        <span class="slider"></span>
+      </label>
     </div>
 
     <div class="setting">
@@ -175,6 +222,7 @@
     const keyboardWidthSlider = document.getElementById('keyboardWidth');
     const keyHeightSlider = document.getElementById('keyHeight');
     const keyboardLayoutSelect = document.getElementById('keyboardLayout');
+    const enableExtensionCheckbox = document.getElementById('enableExtension');
     const saveBtn = document.getElementById('saveBtn');
     const closeBtn = document.getElementById('closeBtn');
 
@@ -227,6 +275,7 @@
           if (settings.keyboardWidth) keyboardWidthSlider.value = settings.keyboardWidth;
           if (settings.keyHeight) keyHeightSlider.value = settings.keyHeight;
           if (settings.keyboardLayout) keyboardLayoutSelect.value = settings.keyboardLayout;
+          if (settings.enableExtension) enableExtensionCheckbox.checked = settings.enableExtension;
           if (settings.tabs) {
             settings.tabs.forEach((tab, index) => {
               if (tabNameInputs[index]) tabNameInputs[index].value = tab.name;
@@ -262,6 +311,7 @@
         keyHeight: keyHeightSlider.value,
         keyboardLayout: keyboardLayoutSelect.value,
         tabs: tabs,
+        enableExtension: enableExtensionCheckbox.checked,
       };
 
       if (window.electronAPI && window.electronAPI.saveSettings) {

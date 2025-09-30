@@ -1,4 +1,4 @@
-const { app, BrowserWindow, BrowserView, ipcMain, screen } = require('electron');
+const { app, BrowserWindow, BrowserView, ipcMain, screen, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const Store = require('electron-store');
@@ -14,6 +14,7 @@ let settingsView;
 let powerMenuView;
 let currentView = 'tab0'; // Default to the first tab
 let previousView = null;
+let autodartsToolsExtensionId = null;
 
 const TOOLBAR_HEIGHT = 72;
 const KEYBOARD_HEIGHT = 300;
@@ -603,6 +604,7 @@ ipcMain.handle('get-settings', async () => {
     keyboardWidth: store.get('keyboard.width', 100),
     keyHeight: store.get('keyboard.keyHeight', 50),
     keyboardLayout: store.get('keyboard.layout', 'de'),
+    enableExtension: store.get('enableExtension', true),
     tabs: store.get('tabs', [
       { name: 'Autodarts', url: 'https://play.autodarts.io/' },
       { name: 'Service', url: 'http://localhost:3180/' }
@@ -612,11 +614,42 @@ ipcMain.handle('get-settings', async () => {
 
 ipcMain.on('save-settings', async (event, settings) => {
   console.log('Saving settings...');
+  const oldEnableExtension = store.get('enableExtension', true);
+
   store.set('volume', settings.volume);
   store.set('keyboard.width', settings.keyboardWidth);
   store.set('keyboard.keyHeight', settings.keyHeight);
   store.set('keyboard.layout', settings.keyboardLayout);
   store.set('tabs', settings.tabs);
+  store.set('enableExtension', settings.enableExtension);
+
+  // Handle extension loading/unloading if the setting changed
+  if (oldEnableExtension !== settings.enableExtension) {
+    if (settings.enableExtension) {
+      if (!autodartsToolsExtensionId) {
+        const extensionPath = path.join(__dirname, 'Extension');
+        if (fs.existsSync(extensionPath)) {
+          try {
+            const extension = await session.defaultSession.loadExtension(extensionPath, { allowFileAccess: true });
+            autodartsToolsExtensionId = extension.id;
+            console.log('SUCCESS: Autodarts Tools extension dynamically loaded with ID:', autodartsToolsExtensionId);
+          } catch (error) {
+            console.error('ERROR: Failed to dynamically load extension:', error);
+          }
+        }
+      }
+    } else {
+      if (autodartsToolsExtensionId) {
+        try {
+          await session.defaultSession.removeExtension(autodartsToolsExtensionId);
+          console.log('SUCCESS: Autodarts Tools extension dynamically unloaded.');
+          autodartsToolsExtensionId = null;
+        } catch (error) {
+          console.error('ERROR: Failed to dynamically unload extension:', error);
+        }
+      }
+    }
+  }
 
   // Apply settings that don't require a reload
   applySettings();
@@ -785,5 +818,26 @@ ipcMain.on('keyboard-shift-status', (ev, isActive) => {
   console.log('Shift status updated from keyboard:', shiftActive);
 });
 
-app.whenReady().then(createWindow);
+app.whenReady().then(async () => {
+  const enableExtension = store.get('enableExtension', true);
+  if (enableExtension) {
+    const extensionPath = path.join(__dirname, 'Extension');
+    if (fs.existsSync(extensionPath)) {
+      try {
+        const extension = await session.defaultSession.loadExtension(extensionPath, { allowFileAccess: true });
+        autodartsToolsExtensionId = extension.id;
+        console.log('SUCCESS: Autodarts Tools extension loaded with ID:', autodartsToolsExtensionId);
+      } catch (error) {
+        console.error('ERROR: Failed to load Autodarts Tools extension:', error);
+      }
+    } else {
+      console.warn('WARN: Autodarts Tools extension directory not found, skipping load.');
+    }
+  } else {
+    console.log('INFO: Autodarts Tools extension is disabled by user setting.');
+  }
+
+  createWindow();
+});
+
 app.on('window-all-closed', () => app.quit());
