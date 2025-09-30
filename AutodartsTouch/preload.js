@@ -2,7 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('api', {
   on: (channel, callback) => {
-    const validChannels = ['update-keyboard-style', 'active-view-changed'];
+    const validChannels = ['update-keyboard-style', 'active-view-changed', 'update-toolbar-style'];
     if (validChannels.includes(channel)) {
       ipcRenderer.on(channel, (event, ...args) => callback(...args));
     }
@@ -37,6 +37,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveSettings: (settings) => ipcRenderer.send('save-settings', settings),
   closeSettings: () => ipcRenderer.send('close-settings'),
   updateKeyboardStyleLive: (style) => ipcRenderer.send('update-keyboard-style-live', style),
+  updateToolbarStyleLive: (style) => ipcRenderer.send('update-toolbar-style-live', style),
 
   // Extension Management API
   getExtensionVersions: () => ipcRenderer.invoke('getExtensionVersions'),
