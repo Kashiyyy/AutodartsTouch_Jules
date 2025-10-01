@@ -464,6 +464,9 @@ app.whenReady().then(async () => {
             console.error('Failed to reload extension after download/update:', error);
           }
         }
+        if (toolbarView && toolbarView.webContents && !toolbarView.webContents.isDestroyed()) {
+          toolbarView.webContents.send('update-installed');
+        }
       }
       return { success };
     }
@@ -535,12 +538,8 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.on('toolbar-ready', () => {
-    // Add a small delay to ensure the view is fully rendered before sending the message
-    setTimeout(() => {
-      if (availableUpdateVersion && toolbarView && toolbarView.webContents && !toolbarView.webContents.isDestroyed()) {
-        toolbarView.webContents.send('update-available', availableUpdateVersion);
-      }
-    }, 200);
+    // Check for updates when the toolbar is ready to display notifications
+    checkForUpdatesAndNotifyToolbar();
   });
 
   ipcMain.handle('get-keyboard-layouts', async () => {
@@ -741,14 +740,11 @@ app.whenReady().then(async () => {
   }
 
   await createWindow();
-
-  // Call the update check after the window is created and ready
-  await checkForUpdatesOnStartup();
 });
 
 app.on('window-all-closed', () => app.quit());
 
-async function checkForUpdatesOnStartup() {
+async function checkForUpdatesAndNotifyToolbar() {
   console.log('Performing startup check for extension updates...');
   const isExtensionEnabled = store.get('enableExtension', false);
 
@@ -764,8 +760,9 @@ async function checkForUpdatesOnStartup() {
     if (installedVersion && latestInfo && latestInfo.version) {
       if (semver.gt(latestInfo.version, installedVersion)) {
         console.log(`Update found: current ${installedVersion}, latest ${latestInfo.version}`);
-        // Store the available update version to be sent when the toolbar is ready
-        availableUpdateVersion = latestInfo.version;
+        if (toolbarView && toolbarView.webContents && !toolbarView.webContents.isDestroyed()) {
+          toolbarView.webContents.send('update-available', 'Tools for Autodarts has a new update.');
+        }
       } else {
         console.log('Extension is already up to date.');
       }

@@ -35,19 +35,37 @@ button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 a
   50% { opacity: 0.4; }
   100% { opacity: 1; }
 }
+@keyframes marquee {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
 #update-notification {
-  display: none; /* Hidden by default */
+  position: absolute;
+  right: 180px;
+  top: 50%;
+  transform: translateY(-50%);
+  max-width: 220px;
+  display: none; /* Changed to 'flex' by JS */
+  flex-direction: row;
   align-items: center;
   background-color: #f0ad4e;
   color: #000;
   padding: 4px 8px;
   border-radius: 6px;
   font-size: 14px;
-  margin-right: 15px; /* Space between notification and buttons */
+  z-index: 10;
 }
 #update-notification p {
+  flex-grow: 1;
+  overflow: hidden;
+  white-space: nowrap;
   margin: 0;
-  padding-right: 8px;
+  padding: 0;
+}
+#update-notification p span {
+  display: inline-block;
+  font-weight: bold;
+  animation: marquee 15s linear infinite;
 }
 #close-update-notification {
   background: none;
@@ -55,8 +73,9 @@ button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 a
   color: #000;
   font-size: 20px;
   cursor: pointer;
-  padding: 0;
+  padding: 0 0 0 8px; /* Space between text and button */
   line-height: 1;
+  flex-shrink: 0;
 }
 </style>
 </head>
@@ -72,7 +91,7 @@ button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 a
 
     <div style="display:flex;align-items:center;justify-content:center;height:100%;">
       <div id="update-notification">
-        <p>Update available!</p>
+        <p><span>Update available!</span></p>
         <button id="close-update-notification" aria-label="Dismiss update notification">&times;</button>
       </div>
       <button class="sidebtn" id="refreshBtn" aria-label="Refresh">&#x27F3;</button>
@@ -128,6 +147,7 @@ button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 a
   }
 
   document.addEventListener('DOMContentLoaded', () => {
+    const closeNotificationBtn = document.getElementById('close-update-notification');
     generateTabs();
 
     // Signal to the main process that the toolbar is ready
@@ -142,12 +162,21 @@ button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 a
         updateActiveTab();
       });
 
-      window.api.on('update-available', (version) => {
+      window.api.on('update-available', (message) => {
         const notification = document.getElementById('update-notification');
-        const notificationText = notification.querySelector('p');
+        const notificationText = notification.querySelector('p span');
         if (notification && notificationText) {
-          notificationText.textContent = `Update v${version} available!`;
+          // Duplicate the message to create a seamless marquee effect
+          const separator = '&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;';
+          notificationText.innerHTML = message + separator + message;
           notification.style.display = 'flex';
+        }
+      });
+
+      window.api.on('update-installed', () => {
+        const notification = document.getElementById('update-notification');
+        if (notification) {
+          notification.style.display = 'none';
         }
       });
 
@@ -175,7 +204,6 @@ button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 a
     webVKBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); if (window.api && window.api.toggleWebKeyboard) window.api.toggleWebKeyboard(); });
     webVKBtn.addEventListener('click', (e) => e.preventDefault());
 
-    const closeNotificationBtn = document.getElementById('close-update-notification');
     closeNotificationBtn.addEventListener('click', () => {
       const notification = document.getElementById('update-notification');
       if (notification) {
