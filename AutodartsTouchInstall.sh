@@ -23,9 +23,11 @@ START_SCRIPT="$APP_DIR/AutodartsTouch.sh"
 AUTOSTART_DESKTOP_DIR="$HOME_DIR/.config/autostart"
 DESKTOP_FILE="$AUTOSTART_DESKTOP_DIR/AutodartsTouch.desktop"
 
-# --- Global variables to store user choices
+# --- Global variables
 ROTATION_CHOICE=""
 ARGON_CHOICE=""
+PACKAGE_MANAGER=""
+IS_RASPBERRY_PI=false
 
 # --- Helper Functions
 print_header() {
@@ -52,8 +54,61 @@ print_error() {
   exit 1
 }
 
+# --- Platform-specific Setup
+# Functions for detecting the environment and setting up platform-specific features.
+
+# Detects if the script is running on a Raspberry Pi.
+detect_raspberry_pi() {
+  if [ -f /proc/device-tree/model ] && grep -q "Raspberry Pi" /proc/device-tree/model; then
+    IS_RASPBERRY_PI=true
+    print_info "Raspberry Pi detected."
+  else
+    print_info "Not a Raspberry Pi. Skipping hardware-specific configurations."
+  fi
+}
+
+# Detects the system's package manager (apt, dnf, yum, pacman).
+detect_package_manager() {
+  if command -v apt &> /dev/null; then
+    PACKAGE_MANAGER="apt"
+  elif command -v dnf &> /dev/null; then
+    PACKAGE_MANAGER="dnf"
+  elif command -v yum &> /dev/null; then
+    PACKAGE_MANAGER="yum"
+  elif command -v pacman &> /dev/null; then
+    PACKAGE_MANAGER="pacman"
+  else
+    print_error "Unsupported package manager. Please install dependencies manually."
+  fi
+  print_info "Detected package manager: $PACKAGE_MANAGER"
+}
+
+# A wrapper function to install packages using the detected package manager.
+install_packages() {
+  local packages=("$@")
+  print_info "Installing packages: ${packages[*]}..."
+  case "$PACKAGE_MANAGER" in
+    apt)
+      apt update
+      apt install -y "${packages[@]}"
+      ;;
+    dnf|yum)
+      # dnf/yum automatically refreshes metadata, so no separate update command is needed
+      dnf install -y "${packages[@]}"
+      ;;
+    pacman)
+      pacman -Sy --noconfirm "${packages[@]}"
+      ;;
+    *)
+      print_error "Package installation not supported for $PACKAGE_MANAGER."
+      ;;
+  esac
+}
+
 # --- Start of Installation
 print_header "Starting Autodarts Touch Setup"
+detect_package_manager
+detect_raspberry_pi
 print_info "Running as user: $GUI_USER"
 print_info "Application will be installed in: $APP_DIR"
 print_info "Installing from branch: $BRANCH_NAME"
@@ -88,35 +143,79 @@ configure_argon_one() {
 }
 
 # Call the functions to gather input
-configure_rotation
-configure_argon_one
+if [ "$IS_RASPBERRY_PI" = true ]; then
+  configure_rotation
+  configure_argon_one
+fi
 
 # --- Step 2: System Update and Package Installation
-print_header "Step 2: Updating System Packages"
-print_info "Updating package lists..."
-apt update
-print_info "Upgrading installed packages... (This may take a while)"
-apt upgrade -y
-print_info "Installing required packages: curl, git, build-essential, alsa-utils..."
-apt install -y curl git build-essential alsa-utils || print_warning "Could not install all packages, but continuing."
+print_header "Step 2: Installing System Dependencies"
+# Translating package names for different distributions
+declare -a packages
+case "$PACKAGE_MANAGER" in
+  apt)
+    packages=("curl" "git" "build-essential" "alsa-utils")
+    ;;
+  dnf|yum)
+    # For Fedora/CentOS, 'Development Tools' group is equivalent to build-essential
+    packages=("curl" "git" "@development-tools" "alsa-utils")
+    ;;
+  pacman)
+    # For Arch, base-devel group is equivalent to build-essential
+    packages=("curl" "git" "base-devel" "alsa-utils")
+    ;;
+  *)
+    print_error "Package name translation not configured for $PACKAGE_MANAGER."
+    ;;
+esac
+
+install_packages "${packages[@]}" || print_warning "Could not install all packages, but continuing."
 
 # --- Step 3: Node.js Installation
 print_header "Step 3: Installing Node.js"
-print_info "Removing any old versions of Node.js..."
-apt remove -y nodejs npm >/dev/null 2>&1 || true
-apt purge -y nodejs npm >/dev/null 2>&1 || true
-apt autoremove -y >/dev/null 2>&1 || true
 
-if command -v node >/dev/null; then
-  print_info "Node.js is already installed."
+# Installs Node.js using a universal method that is not dependent on a specific
+# package manager. It downloads the official binaries, extracts them, and creates
+# symbolic links in /usr/local/bin.
+NODE_VERSION="20.12.2" # Specify a recent LTS version
+ARCH=$(uname -m)
+NODE_ARCH=""
+
+# Map architecture names
+case $ARCH in
+  x86_64) NODE_ARCH="x64" ;;
+  aarch64) NODE_ARCH="arm64" ;;
+  armv7l) NODE_ARCH="armv7l" ;;
+  *) print_error "Unsupported architecture: $ARCH" ;;
+esac
+
+NODE_URL="https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${NODE_ARCH}.tar.xz"
+INSTALL_DIR="/usr/local/lib/nodejs"
+
+if command -v node >/dev/null && [[ "$(node -v)" == "v${NODE_VERSION}" ]]; then
+  print_info "Node.js v${NODE_VERSION} is already installed."
 else
-  print_info "Node.js not found. Installing Node.js 20.x..."
-  curl -fsSL https://deb.nodesource.com/setup_20.x | bash - >/dev/null 2>&1 || true
-  apt install -y nodejs || true
-fi
+  print_info "Installing Node.js v${NODE_VERSION} for ${ARCH}..."
 
-if ! command -v node >/dev/null; then
-  print_error "Node.js installation failed. Please install it manually and re-run the script."
+  # Clean up previous installations
+  rm -rf "$INSTALL_DIR"
+  rm -f /usr/local/bin/node /usr/local/bin/npm /usr/local/bin/npx
+
+  # Download and extract
+  curl -fsSL "$NODE_URL" -o /tmp/node.tar.xz
+  mkdir -p "$INSTALL_DIR"
+  tar -xJf /tmp/node.tar.xz -C "$INSTALL_DIR" --strip-components=1
+  rm /tmp/node.tar.xz
+
+  # Create symlinks
+  ln -s "$INSTALL_DIR/bin/node" /usr/local/bin/node
+  ln -s "$INSTALL_DIR/bin/npm" /usr/local/bin/npm
+  ln -s "$INSTALL_DIR/bin/npx" /usr/local/bin/npx
+
+  # Verify installation
+  if ! command -v node >/dev/null; then
+    print_error "Node.js installation failed. Please install it manually."
+  fi
 fi
 print_success "Node.js is ready. Version: $(node -v)"
 
@@ -180,58 +279,62 @@ fi
 # --- Step 7: Apply System Configurations
 print_header "Step 7: Applying System Configurations"
 
-# Apply screen rotation
-ROTATION_VALUE=""
-case $ROTATION_CHOICE in
-  1) ROTATION_VALUE=0 ;;
-  2) ROTATION_VALUE=1 ;;
-  3) ROTATION_VALUE=2 ;;
-  4) ROTATION_VALUE=3 ;;
-esac
+if [ "$IS_RASPBERRY_PI" = true ]; then
+  # Apply screen rotation
+  ROTATION_VALUE=""
+  case $ROTATION_CHOICE in
+    1) ROTATION_VALUE=0 ;;
+    2) ROTATION_VALUE=1 ;;
+    3) ROTATION_VALUE=2 ;;
+    4) ROTATION_VALUE=3 ;;
+  esac
 
-if [ -n "$ROTATION_VALUE" ]; then
-  CONFIG_FILE="/boot/firmware/config.txt"
-  if [ ! -f "$CONFIG_FILE" ]; then
-    CONFIG_FILE="/boot/config.txt"
-  fi
-  if [ -f "$CONFIG_FILE" ]; then
-    print_info "Updating display rotation settings in $CONFIG_FILE..."
-    sed -i "/^display_hdmi_rotate=/d" "$CONFIG_FILE" 2>/dev/null || true
-    sed -i "/^display_lcd_rotate=/d" "$CONFIG_FILE" 2>/dev/null || true
-    echo "display_hdmi_rotate=$ROTATION_VALUE" >> "$CONFIG_FILE"
-    echo "display_lcd_rotate=$ROTATION_VALUE" >> "$CONFIG_FILE"
-    print_success "Screen rotation set. A reboot is required to apply the change."
-  else
-    print_warning "Could not find config.txt. Skipping rotation setup."
-  fi
-else
-  print_info "Skipping screen rotation setup as requested."
-fi
-
-# Apply Argon One config
-case "$ARGON_CHOICE" in
-  [yY]|[yY][eE][sS])
+  if [ -n "$ROTATION_VALUE" ]; then
     CONFIG_FILE="/boot/firmware/config.txt"
     if [ ! -f "$CONFIG_FILE" ]; then
       CONFIG_FILE="/boot/config.txt"
     fi
     if [ -f "$CONFIG_FILE" ]; then
-      argon_line="dtoverlay=dwc2,dr_mode=host"
-      if grep -q "^${argon_line}" "$CONFIG_FILE"; then
-        print_info "Argon One V5 setting already exists. No changes needed."
-      else
-        print_info "Enabling Argon One V5 USB ports..."
-        echo "$argon_line" >> "$CONFIG_FILE"
-        print_success "Argon One V5 USB ports enabled. A reboot is required."
-      fi
+      print_info "Updating display rotation settings in $CONFIG_FILE..."
+      sed -i "/^display_hdmi_rotate=/d" "$CONFIG_FILE" 2>/dev/null || true
+      sed -i "/^display_lcd_rotate=/d" "$CONFIG_FILE" 2>/dev/null || true
+      echo "display_hdmi_rotate=$ROTATION_VALUE" >> "$CONFIG_FILE"
+      echo "display_lcd_rotate=$ROTATION_VALUE" >> "$CONFIG_FILE"
+      print_success "Screen rotation set. A reboot is required to apply the change."
     else
-      print_warning "Could not find config.txt. Skipping Argon One setup."
+      print_warning "Could not find config.txt. Skipping rotation setup."
     fi
-    ;;
-  *)
-    print_info "Skipping Argon One V5 case setup as requested."
-    ;;
-esac
+  else
+    print_info "Skipping screen rotation setup as requested."
+  fi
+
+  # Apply Argon One config
+  case "$ARGON_CHOICE" in
+    [yY]|[yY][eE][sS])
+      CONFIG_FILE="/boot/firmware/config.txt"
+      if [ ! -f "$CONFIG_FILE" ]; then
+        CONFIG_FILE="/boot/config.txt"
+      fi
+      if [ -f "$CONFIG_FILE" ]; then
+        argon_line="dtoverlay=dwc2,dr_mode=host"
+        if grep -q "^${argon_line}" "$CONFIG_FILE"; then
+          print_info "Argon One V5 setting already exists. No changes needed."
+        else
+          print_info "Enabling Argon One V5 USB ports..."
+          echo "$argon_line" >> "$CONFIG_FILE"
+          print_success "Argon One V5 USB ports enabled. A reboot is required."
+        fi
+      else
+        print_warning "Could not find config.txt. Skipping Argon One setup."
+      fi
+      ;;
+    *)
+      print_info "Skipping Argon One V5 case setup as requested."
+      ;;
+  esac
+else
+  print_info "Skipping all hardware-specific configurations."
+fi
 
 # --- Step 8: Configure Autostart
 print_header "Step 8: Setting up Autostart"
