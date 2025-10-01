@@ -36,8 +36,8 @@ button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 a
   100% { opacity: 1; }
 }
 @keyframes marquee {
-  0%   { transform: translateX(100%); }
-  100% { transform: translateX(-150%); }
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
 }
 #update-notification {
   position: absolute;
@@ -64,7 +64,6 @@ button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 a
 }
 #update-notification p span {
   display: inline-block;
-  padding-left: 100%;
   font-weight: bold;
   animation: marquee 15s linear infinite;
 }
@@ -167,7 +166,9 @@ button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 a
         const notification = document.getElementById('update-notification');
         const notificationText = notification.querySelector('p span');
         if (notification && notificationText) {
-          notificationText.textContent = message;
+          // Duplicate the message to create a seamless marquee effect
+          const separator = '&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;';
+          notificationText.innerHTML = message + separator + message;
           notification.style.display = 'flex';
         }
       });
