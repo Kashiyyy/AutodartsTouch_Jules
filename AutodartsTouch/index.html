@@ -9,7 +9,7 @@
 html,body{margin:0;height:100%;background:transparent;font-family:'Open Sans',sans-serif}
 #toolbar{
   position:fixed; top:0; left:0; right:0; height:72px;
-  display:grid; grid-template-columns:80px 1fr 120px; /* Adjusted for new button */
+  display:grid; grid-template-columns:80px 1fr auto;
   align-items:center; padding:0 12px; z-index:99999;
   background-image:
     radial-gradient(50% 30% at 86% 0%, #313370e3, #40348600),
@@ -30,6 +30,34 @@ button:hover{color:#e0e0e0}
     display: flex; align-items: center; justify-content: center;
 }
 button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 auto;width:66%;height:2px;background:#fff;border-radius:1px}
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.4; }
+  100% { opacity: 1; }
+}
+#update-notification {
+  display: none; /* Hidden by default */
+  align-items: center;
+  background-color: #f0ad4e;
+  color: #000;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 14px;
+  margin-right: 15px; /* Space between notification and buttons */
+}
+#update-notification p {
+  margin: 0;
+  padding-right: 8px;
+}
+#close-update-notification {
+  background: none;
+  border: none;
+  color: #000;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
 </style>
 </head>
 <body>
@@ -43,6 +71,10 @@ button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 a
     </div>
 
     <div style="display:flex;align-items:center;justify-content:center;height:100%;">
+      <div id="update-notification">
+        <p>Update available!</p>
+        <button id="close-update-notification" aria-label="Dismiss update notification">&times;</button>
+      </div>
       <button class="sidebtn" id="refreshBtn" aria-label="Refresh">&#x27F3;</button>
       <button class="sidebtn" id="settingsBtn" aria-label="Settings">&#x2699;</button>
       <button class="sidebtn" id="powerBtn" aria-label="Power">
@@ -98,11 +130,25 @@ button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 a
   document.addEventListener('DOMContentLoaded', () => {
     generateTabs();
 
+    // Signal to the main process that the toolbar is ready
+    if (window.api && window.api.send) {
+      window.api.send('toolbar-ready');
+    }
+
     // Listen for notifications from the main process to update the active tab.
     if (window.api && window.api.on) {
       window.api.on('active-view-changed', (activeViewId) => {
         console.log(`Toolbar received active-view-changed event: ${activeViewId}`);
         updateActiveTab();
+      });
+
+      window.api.on('update-available', (version) => {
+        const notification = document.getElementById('update-notification');
+        const notificationText = notification.querySelector('p');
+        if (notification && notificationText) {
+          notificationText.textContent = `Update v${version} available!`;
+          notification.style.display = 'flex';
+        }
       });
 
       window.api.on('update-toolbar-style', ({ height, fontSize }) => {
@@ -128,6 +174,14 @@ button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 a
     const webVKBtn = document.getElementById('webVKBtn');
     webVKBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); if (window.api && window.api.toggleWebKeyboard) window.api.toggleWebKeyboard(); });
     webVKBtn.addEventListener('click', (e) => e.preventDefault());
+
+    const closeNotificationBtn = document.getElementById('close-update-notification');
+    closeNotificationBtn.addEventListener('click', () => {
+      const notification = document.getElementById('update-notification');
+      if (notification) {
+        notification.style.display = 'none';
+      }
+    });
 
     const settingsBtn = document.getElementById('settingsBtn');
     settingsBtn.addEventListener('click', () => {
