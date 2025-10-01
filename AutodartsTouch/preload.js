@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('api', {
     }
   },
   openSettings: () => ipcRenderer.send('open-settings'),
+  openDevTools: () => ipcRenderer.send('open-dev-tools'),
   switchTab: (t) => ipcRenderer.send('switch-tab', t),
   refresh: () => ipcRenderer.send('refresh'),
   forceReload: () => ipcRenderer.send('force-reload'),
