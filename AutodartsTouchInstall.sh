@@ -7,13 +7,13 @@ set -euo pipefail
 # This script installs and configures the Autodarts Touch application,
 # along with its dependencies and system settings.
 #
-# Website: https://github.com/Kashiyyy/AutodartsTouch
+# Website: https://github.com/Kashiyyy/AutodartsTouch_Jules
 #
 # ===================================================================================
 
 # --- Configuration
 BRANCH_NAME="${1:-main}"
-GITHUB_REPO_URL="https://github.com/Kashiyyy/AutodartsTouch.git"
+GITHUB_REPO_URL="https://github.com/Kashiyyy/AutodartsTouch_Jules.git"
 
 # --- Environment
 GUI_USER="${SUDO_USER:-$(logname)}"

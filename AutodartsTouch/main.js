@@ -464,6 +464,9 @@ app.whenReady().then(async () => {
             console.error('Failed to reload extension after download/update:', error);
           }
         }
+        if (toolbarView && toolbarView.webContents && !toolbarView.webContents.isDestroyed()) {
+          toolbarView.webContents.send('update-installed');
+        }
       }
       return { success };
     }
@@ -758,7 +761,7 @@ async function checkForUpdatesAndNotifyToolbar() {
       if (semver.gt(latestInfo.version, installedVersion)) {
         console.log(`Update found: current ${installedVersion}, latest ${latestInfo.version}`);
         if (toolbarView && toolbarView.webContents && !toolbarView.webContents.isDestroyed()) {
-          toolbarView.webContents.send('update-available', latestInfo.version);
+          toolbarView.webContents.send('update-available', 'Tools for Autodarts has a new update.');
         }
       } else {
         console.log('Extension is already up to date.');
