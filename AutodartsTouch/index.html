@@ -256,31 +256,6 @@ button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 a
         }
     });
 
-    // Handle cursor visibility based on input type
-    let cursorVisible = true; // Assume cursor is visible by default
-
-    function setCursorVisibility(visible) {
-      if (visible !== cursorVisible) {
-        if (window.api && window.api.setCursorVisibility) {
-          window.api.setCursorVisibility(visible);
-          cursorVisible = visible;
-        }
-      }
-    }
-
-    document.addEventListener('pointerdown', (e) => {
-      if (e.pointerType === 'mouse') {
-        setCursorVisibility(true); // Show cursor on mouse click
-      } else {
-        setCursorVisibility(false); // Hide cursor on touch
-      }
-    }, { capture: true });
-
-    document.addEventListener('pointermove', (e) => {
-      if (e.pointerType === 'mouse') {
-        setCursorVisibility(true); // Show cursor on mouse move
-      }
-    }, { capture: true, passive: true });
   });
 
 </script>
