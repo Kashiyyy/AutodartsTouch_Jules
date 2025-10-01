@@ -257,14 +257,28 @@ button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 a
     });
 
     // Handle cursor visibility based on input type
+    let cursorVisible = true; // Assume cursor is visible by default
+
+    function setCursorVisibility(visible) {
+      if (visible !== cursorVisible) {
+        if (window.api && window.api.setCursorVisibility) {
+          window.api.setCursorVisibility(visible);
+          cursorVisible = visible;
+        }
+      }
+    }
+
     document.addEventListener('pointerdown', (e) => {
-      // 'mouse' pointerType indicates a real mouse was used.
-      // Any other type (like 'touch' or 'pen') means we should hide the cursor.
-      const isMouse = e.pointerType === 'mouse';
-      if (window.api && window.api.setCursorVisibility) {
-        window.api.setCursorVisibility(isMouse);
+      if (e.pointerType !== 'mouse') {
+        setCursorVisibility(false); // Hide cursor on touch
       }
     }, { capture: true });
+
+    document.addEventListener('pointermove', (e) => {
+      if (e.pointerType === 'mouse') {
+        setCursorVisibility(true); // Show cursor on mouse move
+      }
+    }, { capture: true, passive: true });
   });
 
 </script>
