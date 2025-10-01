@@ -66,19 +66,13 @@ function setCursorVisibility(visible) {
   }
 }
 
-// Show cursor on mouse move or click, hide on touch
+// Show cursor on mouse move, hide on touch
 window.addEventListener('DOMContentLoaded', () => {
-  document.addEventListener('pointerdown', (e) => {
-    if (e.pointerType === 'mouse') {
-      setCursorVisibility(true);
-    } else {
-      setCursorVisibility(false);
-    }
-  }, { capture: true });
+  document.addEventListener('touchstart', () => {
+    setCursorVisibility(false);
+  }, { capture: true, passive: true });
 
-  document.addEventListener('pointermove', (e) => {
-    if (e.pointerType === 'mouse') {
-      setCursorVisibility(true);
-    }
+  document.addEventListener('mousemove', () => {
+    setCursorVisibility(true);
   }, { capture: true, passive: true });
 });
