@@ -50,3 +50,29 @@ contextBridge.exposeInMainWorld('electronAPI', {
   downloadExtension: () => ipcRenderer.invoke('downloadExtension'),
   openLogFile: () => ipcRenderer.send('open-log-file'),
 });
+
+// --- Global Cursor Visibility ---
+// This logic is placed in the preload script to ensure it runs in the context
+// of every BrowserView, making the cursor behavior consistent across the app.
+
+let cursorVisible = true; // Assume cursor is visible by default
+
+function setCursorVisibility(visible) {
+  if (visible !== cursorVisible) {
+    // We can't use the exposed `api.setCursorVisibility` here because this script
+    // defines that API. We must use ipcRenderer directly.
+    ipcRenderer.send('set-cursor-visibility', visible);
+    cursorVisible = visible;
+  }
+}
+
+// Show cursor on mouse move, hide on touch
+window.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener('touchstart', () => {
+    setCursorVisibility(false);
+  }, { capture: true, passive: true });
+
+  document.addEventListener('mousemove', () => {
+    setCursorVisibility(true);
+  }, { capture: true, passive: true });
+});
