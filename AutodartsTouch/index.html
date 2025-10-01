@@ -45,22 +45,28 @@ button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 a
   top: 50%;
   transform: translateY(-50%);
   max-width: 220px;
-  display: none; /* Hidden by default */
+  display: none; /* Changed to 'flex' by JS */
+  flex-direction: row;
   align-items: center;
   background-color: #f0ad4e;
   color: #000;
-  padding: 4px 0;
+  padding: 4px 8px;
   border-radius: 6px;
   font-size: 14px;
-  overflow: hidden;
   z-index: 10;
 }
 #update-notification p {
-  margin: 0;
-  padding-left: 100%;
-  display: inline-block;
+  flex-grow: 1;
+  overflow: hidden;
   white-space: nowrap;
-  animation: marquee 10s linear infinite;
+  margin: 0;
+  padding: 0;
+}
+#update-notification p span {
+  display: inline-block;
+  padding-left: 100%;
+  font-weight: bold;
+  animation: marquee 15s linear infinite;
 }
 #close-update-notification {
   background: none;
@@ -68,8 +74,9 @@ button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 a
   color: #000;
   font-size: 20px;
   cursor: pointer;
-  padding: 0;
+  padding: 0 0 0 8px; /* Space between text and button */
   line-height: 1;
+  flex-shrink: 0;
 }
 </style>
 </head>
@@ -83,11 +90,11 @@ button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 a
       <!-- Tabs will be dynamically inserted here -->
     </div>
 
-    <div style="display:flex;align-items:center;justify-content:center;height:100%;position:relative;">
+    <div style="display:flex;align-items:center;justify-content:center;height:100%;">
       <div id="update-notification">
-        <p>Update available!</p>
+        <p><span>Update available!</span></p>
+        <button id="close-update-notification" aria-label="Dismiss update notification">&times;</button>
       </div>
-      <button id="close-update-notification" aria-label="Dismiss update notification" style="position:absolute; right:155px; top:50%; transform:translateY(-50%); z-index:11; display:none; background:none; border:none; color:#000; font-size:20px; cursor:pointer; padding:0; line-height:1;">&times;</button>
       <button class="sidebtn" id="refreshBtn" aria-label="Refresh">&#x27F3;</button>
       <button class="sidebtn" id="settingsBtn" aria-label="Settings">&#x2699;</button>
       <button class="sidebtn" id="powerBtn" aria-label="Power">
@@ -158,21 +165,17 @@ button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 a
 
       window.api.on('update-available', (message) => {
         const notification = document.getElementById('update-notification');
-        const notificationText = notification.querySelector('p');
-        const closeBtn = document.getElementById('close-update-notification');
-        if (notification && notificationText && closeBtn) {
+        const notificationText = notification.querySelector('p span');
+        if (notification && notificationText) {
           notificationText.textContent = message;
           notification.style.display = 'flex';
-          closeBtn.style.display = 'block';
         }
       });
 
       window.api.on('update-installed', () => {
         const notification = document.getElementById('update-notification');
-        const closeBtn = document.getElementById('close-update-notification');
-        if (notification && closeBtn) {
+        if (notification) {
           notification.style.display = 'none';
-          closeBtn.style.display = 'none';
         }
       });
 
@@ -204,7 +207,6 @@ button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 a
       const notification = document.getElementById('update-notification');
       if (notification) {
         notification.style.display = 'none';
-        closeNotificationBtn.style.display = 'none';
       }
     });
 
