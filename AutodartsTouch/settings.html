@@ -265,6 +265,7 @@
 
     <div class="buttons">
       <button id="saveBtn">Save & Close</button>
+      <button id="resetBtn" type="button">Reset to Default</button>
       <button id="closeBtn">Close</button>
     </div>
   </div>
@@ -278,6 +279,7 @@
     const toolbarFontSizeSlider = document.getElementById('toolbarFontSize');
     const saveBtn = document.getElementById('saveBtn');
     const closeBtn = document.getElementById('closeBtn');
+    const resetBtn = document.getElementById('resetBtn');
 
     // Extension settings elements
     const enableExtensionCheckbox = document.getElementById('enableExtension');
@@ -508,6 +510,50 @@
         window.electronAPI.saveSettings(settings);
       }
     });
+
+    function resetToDefaults() {
+      // Set UI to defaults
+      volumeSlider.value = 50;
+      toolbarHeightSlider.value = 72;
+      toolbarFontSizeSlider.value = 24;
+      keyboardWidthSlider.value = 100;
+      keyHeightSlider.value = 50;
+      keyboardLayoutSelect.value = 'de';
+      enableExtensionCheckbox.checked = false;
+
+      const defaultTabs = [
+        { name: 'Autodarts', url: 'https://play.autodarts.io/' },
+        { name: 'Service', url: 'http://localhost:3180/' },
+        { name: '', url: '' },
+        { name: '', url: '' },
+        { name: '', url: '' },
+      ];
+      tabNameInputs.forEach((input, index) => input.value = defaultTabs[index].name);
+      tabUrlInputs.forEach((input, index) => input.value = defaultTabs[index].url);
+
+      // Hide extension section immediately
+      extensionStatusDiv.style.display = 'none';
+      document.querySelector('.extension-action-col').style.visibility = 'hidden';
+
+      // Construct settings object from these default values
+      const settings = {
+        volume: 50,
+        keyboardWidth: 100,
+        keyHeight: 50,
+        keyboardLayout: 'de',
+        toolbarHeight: 72,
+        toolbarFontSize: 24,
+        tabs: defaultTabs,
+        enableExtension: false,
+      };
+
+      // Save the default settings, which will also close the window
+      if (window.electronAPI && window.electronAPI.saveSettings) {
+        window.electronAPI.saveSettings(settings);
+      }
+    }
+
+    resetBtn.addEventListener('click', resetToDefaults);
 
     closeBtn.addEventListener('click', () => {
       if (window.electronAPI && window.electronAPI.closeSettings) {
