@@ -168,27 +168,27 @@
       <h2>General & Keyboard</h2>
       <div class="setting-row">
         <div class="setting">
-          <label for="volume">System Volume</label>
+          <label for="volume">System Volume: <span id="volumeValue">50</span></label>
           <input type="range" id="volume" min="0" max="100" value="50">
         </div>
         <div class="setting">
-          <label for="toolbarHeight">Toolbar Height (px)</label>
+          <label for="toolbarHeight">Toolbar Height (px): <span id="toolbarHeightValue">72</span></label>
           <input type="range" id="toolbarHeight" min="48" max="120" value="72">
         </div>
       </div>
       <div class="setting-row">
         <div class="setting">
-          <label for="toolbarFontSize">Toolbar Font/Icon Size (px)</label>
+          <label for="toolbarFontSize">Toolbar Font/Icon Size (px): <span id="toolbarFontSizeValue">24</span></label>
           <input type="range" id="toolbarFontSize" min="16" max="40" value="24">
         </div>
         <div class="setting">
-          <label for="keyboardWidth">Keyboard Width (%)</label>
+          <label for="keyboardWidth">Keyboard Width (%): <span id="keyboardWidthValue">100</span></label>
           <input type="range" id="keyboardWidth" min="50" max="100" value="100">
         </div>
       </div>
       <div class="setting-row">
         <div class="setting">
-          <label for="keyHeight">Key Height (px)</label>
+          <label for="keyHeight">Key Height (px): <span id="keyHeightValue">50</span></label>
           <input type="range" id="keyHeight" min="30" max="80" value="50">
         </div>
         <div class="setting">
@@ -265,6 +265,7 @@
 
     <div class="buttons">
       <button id="saveBtn">Save & Close</button>
+      <button id="resetBtn" type="button">Reset to Default</button>
       <button id="closeBtn">Close</button>
     </div>
   </div>
@@ -278,6 +279,7 @@
     const toolbarFontSizeSlider = document.getElementById('toolbarFontSize');
     const saveBtn = document.getElementById('saveBtn');
     const closeBtn = document.getElementById('closeBtn');
+    const resetBtn = document.getElementById('resetBtn');
 
     // Extension settings elements
     const enableExtensionCheckbox = document.getElementById('enableExtension');
@@ -416,6 +418,15 @@
           toolbarFontSizeSlider.value = settings.toolbarFontSize || 24;
           enableExtensionCheckbox.checked = settings.enableExtension || false;
 
+          // Update display values
+          updateSliderValue(volumeSlider, volumeValue);
+          updateSliderValue(toolbarHeightSlider, toolbarHeightValue);
+          updateSliderValue(keyboardWidthSlider, keyboardWidthValue);
+          updateSliderValue(keyHeightSlider, keyHeightValue);
+
+          // This will also update the font size display
+          adjustFontSizeConstraint();
+
           if (settings.tabs) {
             settings.tabs.forEach((tab, index) => {
               if (tabNameInputs[index]) tabNameInputs[index].value = tab.name;
@@ -437,9 +448,47 @@
 
     keyboardWidthSlider.addEventListener('change', sendLiveUpdate);
     keyHeightSlider.addEventListener('change', sendLiveUpdate);
+    const volumeValue = document.getElementById('volumeValue');
+    const toolbarHeightValue = document.getElementById('toolbarHeightValue');
+    const toolbarFontSizeValue = document.getElementById('toolbarFontSizeValue');
+    const keyboardWidthValue = document.getElementById('keyboardWidthValue');
+    const keyHeightValue = document.getElementById('keyHeightValue');
+
+    function updateSliderValue(slider, display) {
+      display.textContent = slider.value;
+    }
+
+    function adjustFontSizeConstraint() {
+        const height = parseInt(toolbarHeightSlider.value, 10);
+        const newMax = Math.floor((height / 3) * 2);
+        toolbarFontSizeSlider.max = newMax;
+
+        if (parseInt(toolbarFontSizeSlider.value, 10) > newMax) {
+            toolbarFontSizeSlider.value = newMax;
+        }
+        updateSliderValue(toolbarFontSizeSlider, toolbarFontSizeValue);
+        sendLiveToolbarUpdate();
+    }
+
+    volumeSlider.addEventListener('input', () => updateSliderValue(volumeSlider, volumeValue));
+    toolbarHeightSlider.addEventListener('input', () => {
+        updateSliderValue(toolbarHeightSlider, toolbarHeightValue);
+        adjustFontSizeConstraint();
+    });
+    toolbarFontSizeSlider.addEventListener('input', () => {
+        updateSliderValue(toolbarFontSizeSlider, toolbarFontSizeValue);
+        sendLiveToolbarUpdate();
+    });
+    keyboardWidthSlider.addEventListener('input', () => {
+        updateSliderValue(keyboardWidthSlider, keyboardWidthValue);
+        sendLiveUpdate();
+    });
+    keyHeightSlider.addEventListener('input', () => {
+        updateSliderValue(keyHeightSlider, keyHeightValue);
+        sendLiveUpdate();
+    });
+
     keyboardLayoutSelect.addEventListener('change', sendLiveUpdate);
-    toolbarHeightSlider.addEventListener('input', sendLiveToolbarUpdate);
-    toolbarFontSizeSlider.addEventListener('input', sendLiveToolbarUpdate);
 
     enableExtensionCheckbox.addEventListener('change', () => {
       const isEnabled = enableExtensionCheckbox.checked;
@@ -508,6 +557,58 @@
         window.electronAPI.saveSettings(settings);
       }
     });
+
+    function resetToDefaults() {
+      // Set UI to defaults
+      volumeSlider.value = 50;
+      toolbarHeightSlider.value = 72;
+      toolbarFontSizeSlider.value = 24;
+      keyboardWidthSlider.value = 100;
+      keyHeightSlider.value = 50;
+      keyboardLayoutSelect.value = 'de';
+      enableExtensionCheckbox.checked = false;
+
+      // Update display values
+      updateSliderValue(volumeSlider, volumeValue);
+      updateSliderValue(toolbarHeightSlider, toolbarHeightValue);
+      updateSliderValue(keyboardWidthSlider, keyboardWidthValue);
+      updateSliderValue(keyHeightSlider, keyHeightValue);
+      // This will also update the font size display
+      adjustFontSizeConstraint();
+
+      const defaultTabs = [
+        { name: 'Autodarts', url: 'https://play.autodarts.io/' },
+        { name: 'Service', url: 'http://localhost:3180/' },
+        { name: '', url: '' },
+        { name: '', url: '' },
+        { name: '', url: '' },
+      ];
+      tabNameInputs.forEach((input, index) => input.value = defaultTabs[index].name);
+      tabUrlInputs.forEach((input, index) => input.value = defaultTabs[index].url);
+
+      // Hide extension section immediately
+      extensionStatusDiv.style.display = 'none';
+      document.querySelector('.extension-action-col').style.visibility = 'hidden';
+
+      // Construct settings object from these default values
+      const settings = {
+        volume: 50,
+        keyboardWidth: 100,
+        keyHeight: 50,
+        keyboardLayout: 'de',
+        toolbarHeight: 72,
+        toolbarFontSize: 24,
+        tabs: defaultTabs,
+        enableExtension: false,
+      };
+
+      // Save the default settings, which will also close the window
+      if (window.electronAPI && window.electronAPI.saveSettings) {
+        window.electronAPI.saveSettings(settings);
+      }
+    }
+
+    resetBtn.addEventListener('click', resetToDefaults);
 
     closeBtn.addEventListener('click', () => {
       if (window.electronAPI && window.electronAPI.closeSettings) {
