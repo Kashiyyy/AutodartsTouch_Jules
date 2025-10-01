@@ -14,7 +14,6 @@ contextBridge.exposeInMainWorld('api', {
     }
   },
   openSettings: () => ipcRenderer.send('open-settings'),
-  openDevTools: () => ipcRenderer.send('open-dev-tools'),
   switchTab: (t) => ipcRenderer.send('switch-tab', t),
   refresh: () => ipcRenderer.send('refresh'),
   forceReload: () => ipcRenderer.send('force-reload'),
@@ -50,6 +49,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getExtensionVersions: () => ipcRenderer.invoke('getExtensionVersions'),
   downloadExtension: () => ipcRenderer.invoke('downloadExtension'),
   openLogFile: () => ipcRenderer.send('open-log-file'),
+  logToMain: (message) => ipcRenderer.send('log-to-main', message),
 });
 
 // --- Global Cursor Visibility ---
@@ -74,49 +74,55 @@ window.addEventListener('DOMContentLoaded', () => {
   let startY = 0;
   let scrollStartTop = 0;
 
+  const log = (message) => {
+    if (window.electronAPI && window.electronAPI.logToMain) {
+      window.electronAPI.logToMain(message);
+    }
+  };
+
   document.addEventListener('touchstart', (e) => {
-    console.log('[Touch] touchstart event fired.');
+    log('[Touch] touchstart event fired.');
     // Hide cursor on any touch
     setCursorVisibility(false);
 
     const target = e.target;
-    console.log(`[Touch] Target element: ${target.tagName}`);
+    log(`[Touch] Target element: ${target.tagName}`);
 
     // Don't interfere with interactive elements
     if (target.tagName === 'INPUT' || target.tagName === 'BUTTON' || target.tagName === 'SELECT' || target.closest('button, a')) {
       isDragging = false;
-      console.log('[Touch] Interactive element touched. Preventing drag.');
+      log('[Touch] Interactive element touched. Preventing drag.');
       return;
     }
 
     // Prevent default text selection behavior only when starting a potential scroll.
     e.preventDefault();
-    console.log('[Touch] preventDefault() called on touchstart.');
+    log('[Touch] preventDefault() called on touchstart.');
 
     // Only scroll with one finger
     if (e.touches.length === 1) {
       isDragging = true;
       startY = e.touches[0].clientY;
       scrollStartTop = window.scrollY;
-      console.log(`[Touch] Drag started. StartY: ${startY}, ScrollTop: ${scrollStartTop}`);
+      log(`[Touch] Drag started. StartY: ${startY}, ScrollTop: ${scrollStartTop}`);
     }
   }, { capture: true, passive: false }); // passive: false is required for preventDefault
 
   document.addEventListener('touchmove', (e) => {
     if (!isDragging || e.touches.length !== 1) {
-      if (!isDragging) console.log('[Touch] touchmove ignored: not dragging.');
+      if (!isDragging) log('[Touch] touchmove ignored: not dragging.');
       return;
     }
 
     const y = e.touches[0].clientY;
     const walk = (y - startY);
-    console.log(`[Touch] touchmove: clientY=${y}, walk=${walk}, newScrollTop=${scrollStartTop - walk}`);
+    log(`[Touch] touchmove: clientY=${y}, walk=${walk}, newScrollTop=${scrollStartTop - walk}`);
     window.scrollTo(0, scrollStartTop - walk);
 
   }, { capture: true, passive: true });
 
   document.addEventListener('touchend', (e) => {
-    console.log('[Touch] touchend event fired.');
+    log('[Touch] touchend event fired.');
     isDragging = false;
   }, { capture: true, passive: true });
 

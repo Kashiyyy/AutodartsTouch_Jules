@@ -95,7 +95,6 @@ button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 a
         <button id="close-update-notification" aria-label="Dismiss update notification">&times;</button>
       </div>
       <button class="sidebtn" id="refreshBtn" aria-label="Refresh">&#x27F3;</button>
-      <button class="sidebtn" id="devToolsBtn" aria-label="Developer Tools">&#x1F4BB;</button>
       <button class="sidebtn" id="settingsBtn" aria-label="Settings">&#x2699;</button>
       <button class="sidebtn" id="powerBtn" aria-label="Power">
         <svg xmlns="http://www.w3.org/2000/svg" height="28px" viewBox="0 0 24 24" width="28px" fill="#FFFFFF">
@@ -216,13 +215,6 @@ button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 a
     settingsBtn.addEventListener('click', () => {
         if (window.api && window.api.openSettings) {
         window.api.openSettings();
-        }
-    });
-
-    const devToolsBtn = document.getElementById('devToolsBtn');
-    devToolsBtn.addEventListener('click', () => {
-        if (window.api && window.api.openDevTools) {
-            window.api.openDevTools();
         }
     });
 

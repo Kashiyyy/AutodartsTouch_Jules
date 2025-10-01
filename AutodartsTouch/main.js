@@ -485,13 +485,6 @@ app.whenReady().then(async () => {
     }
   });
 
-  ipcMain.on('open-dev-tools', () => {
-    const activeView = (currentView === 'settings') ? settingsView : views[currentView];
-    if (activeView && activeView.webContents) {
-      activeView.webContents.openDevTools();
-    }
-  });
-
   ipcMain.on('switch-tab', (ev, tab) => {
     if (tab && views[tab]) {
       if (currentView === 'settings' && tab !== 'settings') {
@@ -542,6 +535,10 @@ app.whenReady().then(async () => {
       case 'restart': exec('reboot', (err) => { if (err) console.error('Restart command failed:', err); }); break;
       case 'close-app': app.quit(); break;
     }
+  });
+
+  ipcMain.on('log-to-main', (event, message) => {
+    console.log(`[Renderer] ${message}`);
   });
 
   ipcMain.on('toolbar-ready', () => {
