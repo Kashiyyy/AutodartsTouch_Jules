@@ -1,4 +1,4 @@
-const { app, BrowserWindow, BrowserView, ipcMain, screen, session, shell } = require('electron');
+const { app, BrowserWindow, BrowserView, ipcMain, screen, session, shell, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const Store = require('electron-store');
@@ -18,6 +18,7 @@ let powerMenuView;
 let currentView = 'tab0';
 let previousView = null;
 let autodartsToolsExtensionId = null;
+let availableUpdateVersion = null; // To store update info
 
 const GITHUB_REPO = 'creazy231/tools-for-autodarts';
 let EXTENSION_DIR; // Will be initialized once the app is ready
@@ -533,6 +534,15 @@ app.whenReady().then(async () => {
     }
   });
 
+  ipcMain.on('toolbar-ready', () => {
+    // Add a small delay to ensure the view is fully rendered before sending the message
+    setTimeout(() => {
+      if (availableUpdateVersion && toolbarView && toolbarView.webContents && !toolbarView.webContents.isDestroyed()) {
+        toolbarView.webContents.send('update-available', availableUpdateVersion);
+      }
+    }, 200);
+  });
+
   ipcMain.handle('get-keyboard-layouts', async () => {
     const layoutDir = path.join(__dirname, 'keyboard', 'layouts');
     try {
@@ -730,7 +740,39 @@ app.whenReady().then(async () => {
     }
   }
 
-  createWindow();
+  await createWindow();
+
+  // Call the update check after the window is created and ready
+  await checkForUpdatesOnStartup();
 });
 
 app.on('window-all-closed', () => app.quit());
+
+async function checkForUpdatesOnStartup() {
+  console.log('Performing startup check for extension updates...');
+  const isExtensionEnabled = store.get('enableExtension', false);
+
+  if (!isExtensionEnabled) {
+    console.log('Extension is disabled, skipping update check.');
+    return;
+  }
+
+  try {
+    const installedVersion = getInstalledExtensionVersion();
+    const latestInfo = await getLatestExtensionInfo();
+
+    if (installedVersion && latestInfo && latestInfo.version) {
+      if (semver.gt(latestInfo.version, installedVersion)) {
+        console.log(`Update found: current ${installedVersion}, latest ${latestInfo.version}`);
+        // Store the available update version to be sent when the toolbar is ready
+        availableUpdateVersion = latestInfo.version;
+      } else {
+        console.log('Extension is already up to date.');
+      }
+    } else {
+      console.log('Could not verify installed or latest version. Skipping notification.');
+    }
+  } catch (error) {
+    console.error('An error occurred during the startup update check:', error);
+  }
+}

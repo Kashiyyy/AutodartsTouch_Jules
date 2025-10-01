@@ -2,9 +2,15 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('api', {
   on: (channel, callback) => {
-    const validChannels = ['update-keyboard-style', 'active-view-changed', 'update-toolbar-style'];
+    const validChannels = ['update-keyboard-style', 'active-view-changed', 'update-toolbar-style', 'update-available'];
     if (validChannels.includes(channel)) {
       ipcRenderer.on(channel, (event, ...args) => callback(...args));
+    }
+  },
+  send: (channel, data) => {
+    const validSendChannels = ['toolbar-ready'];
+    if (validSendChannels.includes(channel)) {
+      ipcRenderer.send(channel, data);
     }
   },
   openSettings: () => ipcRenderer.send('open-settings'),
