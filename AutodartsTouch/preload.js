@@ -74,38 +74,48 @@ window.addEventListener('DOMContentLoaded', () => {
   let scrollStartTop = 0;
 
   document.addEventListener('touchstart', (e) => {
+    console.log('[Touch] touchstart event fired.');
     // Hide cursor on any touch
     setCursorVisibility(false);
 
     const target = e.target;
+    console.log(`[Touch] Target element: ${target.tagName}`);
+
     // Don't interfere with interactive elements
     if (target.tagName === 'INPUT' || target.tagName === 'BUTTON' || target.tagName === 'SELECT' || target.closest('button, a')) {
       isDragging = false;
+      console.log('[Touch] Interactive element touched. Preventing drag.');
       return;
     }
 
     // Prevent default text selection behavior only when starting a potential scroll.
-    // This is the key to preventing text selection on drag.
     e.preventDefault();
+    console.log('[Touch] preventDefault() called on touchstart.');
 
     // Only scroll with one finger
     if (e.touches.length === 1) {
       isDragging = true;
       startY = e.touches[0].clientY;
       scrollStartTop = window.scrollY;
+      console.log(`[Touch] Drag started. StartY: ${startY}, ScrollTop: ${scrollStartTop}`);
     }
   }, { capture: true, passive: false }); // passive: false is required for preventDefault
 
   document.addEventListener('touchmove', (e) => {
-    if (!isDragging || e.touches.length !== 1) return;
+    if (!isDragging || e.touches.length !== 1) {
+      if (!isDragging) console.log('[Touch] touchmove ignored: not dragging.');
+      return;
+    }
 
     const y = e.touches[0].clientY;
     const walk = (y - startY);
+    console.log(`[Touch] touchmove: clientY=${y}, walk=${walk}, newScrollTop=${scrollStartTop - walk}`);
     window.scrollTo(0, scrollStartTop - walk);
 
   }, { capture: true, passive: true });
 
-  document.addEventListener('touchend', () => {
+  document.addEventListener('touchend', (e) => {
+    console.log('[Touch] touchend event fired.');
     isDragging = false;
   }, { capture: true, passive: true });
 
