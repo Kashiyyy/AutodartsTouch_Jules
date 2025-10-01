@@ -73,36 +73,37 @@ window.addEventListener('DOMContentLoaded', () => {
   let startY = 0;
   let scrollStartTop = 0;
 
-  // Combined touchstart listener for both scrolling and cursor visibility
   document.addEventListener('touchstart', (e) => {
     // Hide cursor on any touch
     setCursorVisibility(false);
 
-    // Scrolling logic
+    const target = e.target;
+    // Don't interfere with interactive elements
+    if (target.tagName === 'INPUT' || target.tagName === 'BUTTON' || target.tagName === 'SELECT' || target.closest('button, a')) {
+      isDragging = false;
+      return;
+    }
+
+    // Prevent default text selection behavior only when starting a potential scroll.
+    // This is the key to preventing text selection on drag.
+    e.preventDefault();
+
+    // Only scroll with one finger
     if (e.touches.length === 1) {
-      const target = e.target;
-      // Don't interfere with interactive elements
-      if (target.tagName === 'INPUT' || target.tagName === 'BUTTON' || target.tagName === 'SELECT' || target.closest('button, a')) {
-        isDragging = false; // Ensure dragging is off if we're on a button
-        return;
-      }
       isDragging = true;
       startY = e.touches[0].clientY;
       scrollStartTop = window.scrollY;
     }
-  }, { capture: true, passive: true });
+  }, { capture: true, passive: false }); // passive: false is required for preventDefault
 
   document.addEventListener('touchmove', (e) => {
-    if (isDragging && e.touches.length === 1) {
-      const y = e.touches[0].clientY;
-      const walk = (y - startY);
-      // Only preventDefault when actually scrolling to allow for vertical drags
-      if (Math.abs(walk) > 5) { // Threshold to prevent accidental scrolls
-        e.preventDefault();
-        window.scrollTo(0, scrollStartTop - walk);
-      }
-    }
-  }, { capture: true, passive: false }); // passive: false is required for preventDefault
+    if (!isDragging || e.touches.length !== 1) return;
+
+    const y = e.touches[0].clientY;
+    const walk = (y - startY);
+    window.scrollTo(0, scrollStartTop - walk);
+
+  }, { capture: true, passive: true });
 
   document.addEventListener('touchend', () => {
     isDragging = false;
