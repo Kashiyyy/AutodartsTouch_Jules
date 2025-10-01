@@ -269,7 +269,9 @@ button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 a
     }
 
     document.addEventListener('pointerdown', (e) => {
-      if (e.pointerType !== 'mouse') {
+      if (e.pointerType === 'mouse') {
+        setCursorVisibility(true); // Show cursor on mouse click
+      } else {
         setCursorVisibility(false); // Hide cursor on touch
       }
     }, { capture: true });
