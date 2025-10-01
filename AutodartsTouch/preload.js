@@ -68,8 +68,44 @@ function setCursorVisibility(visible) {
 
 // Show cursor on mouse move, hide on touch
 window.addEventListener('DOMContentLoaded', () => {
-  document.addEventListener('touchstart', () => {
+  // --- Touch Scrolling ---
+  let isDragging = false;
+  let startY = 0;
+  let scrollStartTop = 0;
+
+  // Combined touchstart listener for both scrolling and cursor visibility
+  document.addEventListener('touchstart', (e) => {
+    // Hide cursor on any touch
     setCursorVisibility(false);
+
+    // Scrolling logic
+    if (e.touches.length === 1) {
+      const target = e.target;
+      // Don't interfere with interactive elements
+      if (target.tagName === 'INPUT' || target.tagName === 'BUTTON' || target.tagName === 'SELECT' || target.closest('button, a')) {
+        isDragging = false; // Ensure dragging is off if we're on a button
+        return;
+      }
+      isDragging = true;
+      startY = e.touches[0].clientY;
+      scrollStartTop = window.scrollY;
+    }
+  }, { capture: true, passive: true });
+
+  document.addEventListener('touchmove', (e) => {
+    if (isDragging && e.touches.length === 1) {
+      const y = e.touches[0].clientY;
+      const walk = (y - startY);
+      // Only preventDefault when actually scrolling to allow for vertical drags
+      if (Math.abs(walk) > 5) { // Threshold to prevent accidental scrolls
+        e.preventDefault();
+        window.scrollTo(0, scrollStartTop - walk);
+      }
+    }
+  }, { capture: true, passive: false }); // passive: false is required for preventDefault
+
+  document.addEventListener('touchend', () => {
+    isDragging = false;
   }, { capture: true, passive: true });
 
   document.addEventListener('mousemove', () => {
