@@ -68,8 +68,34 @@ function setCursorVisibility(visible) {
 
 // Show cursor on mouse move, hide on touch
 window.addEventListener('DOMContentLoaded', () => {
-  document.addEventListener('touchstart', () => {
+  // --- Touch Scrolling ---
+  let isDragging = false;
+  let startY = 0;
+  let scrollStartTop = 0;
+
+  document.addEventListener('touchstart', (e) => {
+    // Hide cursor on any touch
     setCursorVisibility(false);
+
+    // Only scroll with one finger
+    if (e.touches.length === 1) {
+      isDragging = true;
+      startY = e.touches[0].clientY;
+      scrollStartTop = window.scrollY;
+    }
+  }, { capture: true, passive: true });
+
+  document.addEventListener('touchmove', (e) => {
+    if (!isDragging || e.touches.length !== 1) return;
+
+    const y = e.touches[0].clientY;
+    const walk = (y - startY);
+    window.scrollTo(0, scrollStartTop - walk);
+
+  }, { capture: true, passive: true });
+
+  document.addEventListener('touchend', () => {
+    isDragging = false;
   }, { capture: true, passive: true });
 
   document.addEventListener('mousemove', () => {
