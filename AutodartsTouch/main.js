@@ -465,13 +465,22 @@ app.whenReady().then(async () => {
     try {
       const installed = getInstalledAppVersion();
       const latestInfo = await getLatestAppInfo();
-      if (!latestInfo) return { error: 'Could not fetch latest version info from GitHub.' };
+      if (!latestInfo) return { error: 'Could not fetch latest version info from GitHub.', installed };
       const latest = latestInfo.version;
-      const isUpdateAvailable = installed && latest ? semver.gt(latest, installed) : false;
+
+      let isUpdateAvailable = false;
+      // Only compare versions if both are valid semantic versions.
+      // This prevents errors when a branch name like "main" is installed.
+      if (semver.valid(installed) && semver.valid(latest)) {
+        isUpdateAvailable = semver.gt(latest, installed);
+      }
+
       return { installed, latest, isUpdateAvailable };
     } catch (error) {
+      // Return a generic error but still provide the installed version if possible
       console.error('IPC: getAppVersions error:', error);
-      return { error: error.message };
+      const installed = getInstalledAppVersion();
+      return { error: error.message, installed };
     }
   });
 
