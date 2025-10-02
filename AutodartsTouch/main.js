@@ -118,14 +118,26 @@ const getSetting = (key, defaultValue) => {
 
 toolbarHeight = getSetting('toolbar.height', 72);
 
-// Helper function to inject CSS that disables text selection.
+// Helper function to inject CSS that disables text selection and hides scrollbars.
 function applyGlobalCss(view) {
   if (!view || !view.webContents || view.webContents.isDestroyed()) return;
 
-  const css = `html, body { -webkit-user-select: none !important; user-select: none !important; } input, textarea { -webkit-user-select: auto !important; user-select: auto !important; }`;
+  const css = `
+    html, body {
+      -webkit-user-select: none !important;
+      user-select: none !important;
+    }
+    input, textarea {
+      -webkit-user-select: auto !important;
+      user-select: auto !important;
+    }
+    *::-webkit-scrollbar {
+      display: none;
+    }
+  `;
 
   const doInject = () => {
-    view.webContents.insertCSS(css).catch(err => console.error(`Failed to inject global CSS:`, err));
+    view.webContents.insertCSS(css.trim()).catch(err => console.error(`Failed to inject global CSS:`, err));
   };
 
   if (view.webContents.isLoading()) {

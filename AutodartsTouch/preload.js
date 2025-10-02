@@ -68,32 +68,6 @@ function setCursorVisibility(visible) {
 
 // Show cursor on mouse move, hide on touch
 window.addEventListener('DOMContentLoaded', () => {
-  // --- Custom Scrollbar Injection ---
-   const style = document.createElement('style');
-  style.textContent = `
-    html, body {
-      overflow: overlay !important;
-    }
-    *::-webkit-scrollbar {
-      width: 5px !important;
-      height: 5px !important;
-    }
-    *::-webkit-scrollbar-track {
-      background: transparent !important;
-    }
-    *::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.2) !important;
-      border-radius: 5px !important;
-    }
-    *::-webkit-scrollbar-thumb:hover {
-      background: rgba(255, 255, 255, 0.4) !important;
-    }
-    *::-webkit-scrollbar-corner {
-      background: transparent !important;
-    }
-  `;
-  document.head.append(style);
-
   // --- Touch Scrolling ---
   let isDragging = false;
   let startY = 0;
