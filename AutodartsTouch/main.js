@@ -469,10 +469,15 @@ app.whenReady().then(async () => {
       const latest = latestInfo.version;
 
       let isUpdateAvailable = false;
-      // Only compare versions if both are valid semantic versions.
-      // This prevents errors when a branch name like "main" is installed.
-      if (semver.valid(installed) && semver.valid(latest)) {
-        isUpdateAvailable = semver.gt(latest, installed);
+      // If the latest version is valid and the installed version is not,
+      // consider an update available (e.g., from 'main' to a release).
+      if (semver.valid(latest)) {
+        if (!semver.valid(installed)) {
+          isUpdateAvailable = true;
+        } else {
+          // Both are valid, so compare them.
+          isUpdateAvailable = semver.gt(latest, installed);
+        }
       }
 
       return { installed, latest, isUpdateAvailable };
