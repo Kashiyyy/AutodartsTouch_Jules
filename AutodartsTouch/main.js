@@ -117,6 +117,24 @@ const getSetting = (key, defaultValue) => {
 };
 
 toolbarHeight = getSetting('toolbar.height', 72);
+
+// Helper function to inject CSS that disables text selection.
+function applyGlobalCss(view) {
+  if (!view || !view.webContents || view.webContents.isDestroyed()) return;
+
+  const css = `html, body { -webkit-user-select: none !important; user-select: none !important; } input, textarea { -webkit-user-select: auto !important; user-select: auto !important; }`;
+
+  const doInject = () => {
+    view.webContents.insertCSS(css).catch(err => console.error(`Failed to inject global CSS:`, err));
+  };
+
+  if (view.webContents.isLoading()) {
+    view.webContents.once('dom-ready', doInject);
+  } else {
+    doInject();
+  }
+}
+
 const KEYBOARD_HEIGHT = 300;
 let keyboardVisible = false;
 let shiftActive = false;
@@ -139,6 +157,7 @@ async function createWindow() {
   });
 
   settingsView = new BrowserView({ webPreferences: { contextIsolation: true, sandbox: false, preload: path.join(__dirname, 'preload.js') } });
+  applyGlobalCss(settingsView);
   mainWindow.addBrowserView(settingsView);
   settingsView.webContents.loadFile(path.join(__dirname, 'settings.html'));
 
@@ -146,6 +165,7 @@ async function createWindow() {
     webPreferences: { contextIsolation: true, sandbox: false, preload: path.join(__dirname, 'preload.js') },
     transparent: true
   });
+  applyGlobalCss(powerMenuView);
   mainWindow.addBrowserView(powerMenuView);
   powerMenuView.webContents.loadFile(path.join(__dirname, 'power-menu.html'));
 
@@ -169,6 +189,7 @@ function createDynamicViews() {
   tabs.forEach((tab, index) => {
     if (tab && tab.url && tab.url.trim() !== '') {
       const view = new BrowserView({ webPreferences: { contextIsolation: true, sandbox: false, preload: path.join(__dirname, 'preload.js') } });
+      applyGlobalCss(view);
       mainWindow.addBrowserView(view);
       views[`tab${index}`] = view;
       loadingPromises.push(view.webContents.loadURL(tab.url).catch(e => console.error(`tab${index} load error:`, e)));
@@ -178,6 +199,7 @@ function createDynamicViews() {
   toolbarView = new BrowserView({
     webPreferences: { contextIsolation: true, sandbox: false, preload: path.join(__dirname, 'preload.js') }
   });
+  applyGlobalCss(toolbarView);
   mainWindow.addBrowserView(toolbarView);
   loadingPromises.push(toolbarView.webContents.loadFile(path.join(__dirname, 'index.html')));
 
@@ -185,6 +207,7 @@ function createDynamicViews() {
     webPreferences: { contextIsolation: true, sandbox: false, preload: path.join(__dirname, 'preload.js') },
     transparent: true
   });
+  applyGlobalCss(keyboardView);
   mainWindow.addBrowserView(keyboardView);
   loadingPromises.push(keyboardView.webContents.loadFile(path.join(__dirname, 'keyboard', 'index.html')));
 
@@ -535,10 +558,6 @@ app.whenReady().then(async () => {
       case 'restart': exec('reboot', (err) => { if (err) console.error('Restart command failed:', err); }); break;
       case 'close-app': app.quit(); break;
     }
-  });
-
-  ipcMain.on('log-to-main', (event, message) => {
-    console.log(`[Renderer] ${message}`);
   });
 
   ipcMain.on('toolbar-ready', () => {
