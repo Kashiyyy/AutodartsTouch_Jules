@@ -316,7 +316,6 @@ function updateKeyboardBounds() {
 
 function showKeyboardView() {
   if (!keyboardVisible) {
-    console.log('Showing keyboard view');
     if (keyboardView && keyboardView.webContents) {
       keyboardView.webContents.executeJavaScript('window.showKeyboard && window.showKeyboard()').catch(e => console.error('Failed to reset keyboard:', e));
     }
@@ -330,7 +329,6 @@ function showKeyboardView() {
 
 function hideKeyboardView() {
   if (keyboardVisible) {
-    console.log('Hiding keyboard view');
     keyboardVisible = false;
     if (mainWindow && keyboardView) {
       const [w, h] = mainWindow.getSize();
@@ -408,7 +406,7 @@ function applyKeyboardStyle(style) {
 
 function injectFocusDetector(view, viewName) {
   if (!view || !view.webContents || view.webContents.isDestroyed()) {
-    console.error(`[Debug] Skipping focus injection for invalid/destroyed view: ${viewName}`);
+    console.error(`Skipping focus injection for invalid/destroyed view: ${viewName}`);
     return;
   }
   const script = `(function() {
@@ -433,7 +431,7 @@ function injectFocusDetector(view, viewName) {
       }, 100);
     }, true);
   })();`;
-  const doInjection = () => view.webContents.executeJavaScript(script).catch(err => console.error(`[Debug] FAILED to inject focus script into ${viewName}:`, err));
+  const doInjection = () => view.webContents.executeJavaScript(script).catch(err => console.error(`Failed to inject focus script into ${viewName}:`, err));
   if (view.webContents.isLoading()) view.webContents.once('dom-ready', doInjection);
   else doInjection();
 }
@@ -452,14 +450,12 @@ app.whenReady().then(async () => {
 
   // Register IPC Handlers that depend on app paths
   ipcMain.handle('getExtensionVersions', async () => {
-    console.log('IPC: getExtensionVersions called.');
     try {
       const installed = getInstalledExtensionVersion();
       const latestInfo = await getLatestExtensionInfo();
       if (!latestInfo) return { error: 'Could not fetch latest version info from GitHub.' };
       const latest = latestInfo.version;
       const isUpdateAvailable = installed && latest ? semver.gt(latest, installed) : false;
-      console.log(`IPC: getExtensionVersions returning: installed=${installed}, latest=${latest}, updateAvailable=${isUpdateAvailable}`);
       return { installed, latest, isUpdateAvailable };
     } catch (error) {
       console.error('IPC: getExtensionVersions error:', error);
@@ -468,7 +464,6 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.handle('downloadExtension', async () => {
-    console.log('IPC: downloadExtension called.');
     const latestInfo = await getLatestExtensionInfo();
     if (latestInfo && latestInfo.url && latestInfo.version) {
       const success = await downloadAndInstallExtension(latestInfo.url, latestInfo.version);
@@ -685,7 +680,6 @@ app.whenReady().then(async () => {
   ipcMain.on('keyboard-height-changed', (event, height) => {
     if (height && height > 100) {
       if (keyboardActualHeight !== height) {
-        console.log(`IPC: Keyboard height updated to ${height}px`);
         keyboardActualHeight = height;
         if (keyboardVisible) {
           updateKeyboardBounds();
@@ -693,7 +687,7 @@ app.whenReady().then(async () => {
         }
       }
     } else {
-      console.warn(`IPC: Received invalid keyboard height: ${height}px. Using fallback.`);
+      // Using a fallback height if the received height is invalid
       keyboardActualHeight = 250;
       if (keyboardVisible) {
         updateKeyboardBounds();
@@ -702,20 +696,15 @@ app.whenReady().then(async () => {
     }
   });
   ipcMain.on('input-focused', (event, viewName) => {
-    console.log(`[FOCUS_DEBUG] Main process received 'input-focused' from view: ${viewName}.`);
     if (!keyboardVisible) {
-      console.log('[FOCUS_DEBUG] Keyboard not visible, showing it now.');
       showKeyboardView();
     }
   });
 
   ipcMain.on('input-blurred', (event, viewName) => {
-    console.log(`[FOCUS_DEBUG] Main process received 'input-blurred' from view: ${viewName}.`);
     if (keyboardVisible && autoCloseEnabled) {
-      console.log('[FOCUS_DEBUG] Keyboard is visible and auto-close is enabled. Hiding keyboard after delay.');
       setTimeout(() => {
         if (keyboardVisible && autoCloseEnabled) {
-          console.log('[FOCUS_DEBUG] Auto-hiding keyboard now.');
           hideKeyboardView();
         }
       }, 300);
