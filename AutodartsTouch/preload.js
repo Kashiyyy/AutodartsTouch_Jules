@@ -71,9 +71,6 @@ window.addEventListener('DOMContentLoaded', () => {
   // --- Custom Scrollbar Injection ---
   const styleId = 'autodarts-touch-scrollbar-style';
   const customScrollbarCSS = `
-    html, body {
-      overflow: overlay !important;
-    }
     *::-webkit-scrollbar {
       width: 5px !important;
       height: 5px !important;
