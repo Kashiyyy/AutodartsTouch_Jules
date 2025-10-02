@@ -71,33 +71,25 @@ window.addEventListener('DOMContentLoaded', () => {
   // --- Custom Scrollbar Injection ---
   const styleId = 'autodarts-touch-scrollbar-style';
   const customScrollbarCSS = `
-    html, body {
+    html, body, div {
       overflow-y: overlay !important;
     }
-    html::-webkit-scrollbar,
-    body::-webkit-scrollbar,
     *::-webkit-scrollbar {
       width: 8px !important;
       height: 8px !important;
     }
-    html::-webkit-scrollbar-track,
-    body::-webkit-scrollbar-track,
     *::-webkit-scrollbar-track {
       background: transparent !important;
     }
-    html::-webkit-scrollbar-thumb,
-    body::-webkit-scrollbar-thumb,
     *::-webkit-scrollbar-thumb {
       background: #888 !important;
       border-radius: 4px !important;
+      border: 2px solid transparent !important;
+      background-clip: content-box !important;
     }
-    html::-webkit-scrollbar-thumb:hover,
-    body::-webkit-scrollbar-thumb:hover,
     *::-webkit-scrollbar-thumb:hover {
       background: #aaa !important;
     }
-    html::-webkit-scrollbar-corner,
-    body::-webkit-scrollbar-corner,
     *::-webkit-scrollbar-corner {
       background: transparent !important;
     }
