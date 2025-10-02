@@ -94,13 +94,18 @@ window.addEventListener('DOMContentLoaded', () => {
   `;
 
   const createOrUpdateStyleElement = () => {
-    let style = document.getElementById(styleId);
-    if (!style) {
-      style = document.createElement('style');
-      style.id = styleId;
-      style.textContent = customScrollbarCSS;
+    // To prevent duplicate style tags, which cause rendering issues,
+    // we first remove the old style element if it exists.
+    const oldStyle = document.getElementById(styleId);
+    if (oldStyle) {
+      oldStyle.remove();
     }
-    // Ensure our style is always the last element in the head to give it priority
+
+    // Then, we create and append the new, updated style element.
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = customScrollbarCSS;
+    // Appending it to the head ensures it's applied last, giving it priority.
     document.head.appendChild(style);
   };
 
