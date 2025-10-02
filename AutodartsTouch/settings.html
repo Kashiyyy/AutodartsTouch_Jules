@@ -221,6 +221,20 @@
     </div>
 
     <div class="settings-section">
+      <h2>Version & Update</h2>
+      <div class="extension-grid">
+        <div id="app-version-status" class="extension-info-col" style="text-align: center; grid-column: span 2;">
+            <p>Installed: <span id="current-app-version">...</span> | Latest: <span id="latest-app-version">...</span></p>
+            <p>Status: <span id="app-update-message" style="color: #f0ad4e;"></span></p>
+        </div>
+        <div class="extension-action-col" style="text-align: center;">
+            <button id="update-app-btn" style="display: none;">Update</button>
+            <button id="reinstall-app-btn" style="display: none;">Reinstall</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section">
       <h2>Tab Settings</h2>
       <div class="tab-setting-grid">
         <h3>Tab 1</h3>
@@ -290,6 +304,13 @@
     const updateExtensionBtn = document.getElementById('update-extension-btn');
     const downloadExtensionBtn = document.getElementById('download-extension-btn');
     const reinstallExtensionBtn = document.getElementById('reinstall-extension-btn');
+
+    // App version elements
+    const currentAppVersionSpan = document.getElementById('current-app-version');
+    const latestAppVersionSpan = document.getElementById('latest-app-version');
+    const appUpdateMessageSpan = document.getElementById('app-update-message');
+    const updateAppBtn = document.getElementById('update-app-btn');
+    const reinstallAppBtn = document.getElementById('reinstall-app-btn');
 
     const tabNameInputs = [
       document.getElementById('tabName1'),
@@ -394,8 +415,72 @@
         }
     }
 
+    async function updateAppVersionStatus() {
+        if (!window.electronAPI || !window.electronAPI.getAppVersions) return;
+
+        appUpdateMessageSpan.textContent = 'Checking for updates...';
+        currentAppVersionSpan.textContent = '...';
+        latestAppVersionSpan.textContent = '...';
+        updateAppBtn.style.display = 'none';
+        reinstallAppBtn.style.display = 'none';
+
+        const versions = await window.electronAPI.getAppVersions();
+
+        if (versions.error) {
+            appUpdateMessageSpan.textContent = `Error: ${versions.error}`;
+            appUpdateMessageSpan.style.color = '#ff6b6b';
+            currentAppVersionSpan.textContent = 'Unknown';
+            latestAppVersionSpan.textContent = 'Unknown';
+            reinstallAppBtn.style.display = 'inline-block'; // Allow reinstall even if check fails
+            return;
+        }
+
+        currentAppVersionSpan.textContent = versions.installed || 'Not found';
+        latestAppVersionSpan.textContent = versions.latest || 'Could not fetch';
+
+        if (versions.isUpdateAvailable) {
+            appUpdateMessageSpan.textContent = 'An update is available.';
+            appUpdateMessageSpan.style.color = '#f0ad4e';
+            updateAppBtn.textContent = `Update to v${versions.latest}`;
+            updateAppBtn.style.display = 'inline-block';
+            reinstallAppBtn.style.display = 'inline-block';
+        } else {
+            appUpdateMessageSpan.textContent = 'You have the latest version.';
+            appUpdateMessageSpan.style.color = '#4caf50'; // Green for up-to-date
+            reinstallAppBtn.style.display = 'inline-block';
+        }
+    }
+
+    reinstallAppBtn.addEventListener('click', () => {
+        const currentVersion = currentAppVersionSpan.textContent;
+        if (currentVersion && currentVersion !== 'Not found' && currentVersion !== 'Unknown') {
+            reinstallAppBtn.textContent = 'Reinstalling...';
+            reinstallAppBtn.disabled = true;
+            updateAppBtn.disabled = true;
+            if (window.electronAPI) window.electronAPI.reinstallApp(currentVersion);
+        } else {
+            appUpdateMessageSpan.textContent = 'Cannot reinstall without knowing the current version.';
+            appUpdateMessageSpan.style.color = '#ff6b6b';
+        }
+    });
+
+    updateAppBtn.addEventListener('click', () => {
+        const latestVersion = latestAppVersionSpan.textContent;
+        if (latestVersion && latestVersion !== 'Could not fetch') {
+            updateAppBtn.textContent = 'Updating...';
+            updateAppBtn.disabled = true;
+            reinstallAppBtn.disabled = true;
+            if (window.electronAPI) window.electronAPI.updateApp(latestVersion);
+        } else {
+            appUpdateMessageSpan.textContent = 'Cannot update without knowing the latest version.';
+            appUpdateMessageSpan.style.color = '#ff6b6b';
+        }
+    });
+
     async function loadInitialData() {
       if (!window.electronAPI) return;
+
+      updateAppVersionStatus();
 
       if (window.electronAPI.getKeyboardLayouts) {
         const layouts = await window.electronAPI.getKeyboardLayouts();

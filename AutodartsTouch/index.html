@@ -9,7 +9,7 @@
 html,body{margin:0;height:100%;background:transparent;font-family:'Open Sans',sans-serif}
 #toolbar{
   position:fixed; top:0; left:0; right:0; height:72px;
-  display:grid; grid-template-columns:80px 1fr auto;
+  display:grid; grid-template-columns:auto 1fr auto;
   align-items:center; padding:0 12px; z-index:99999;
   background-image:
     radial-gradient(50% 30% at 86% 0%, #313370e3, #40348600),
@@ -81,8 +81,9 @@ button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 a
 </head>
 <body>
   <div id="toolbar" role="toolbar" aria-label="AutodartsTouch Controls">
-    <div style="display:flex;align-items:center;justify-content:center;height:100%;">
+    <div style="display:flex;align-items:center;justify-content:center;height:100%;gap:8px;">
       <button class="sidebtn" id="webVKBtn" aria-label="Web Keyboard">&#x2328;</button>
+      <button class="sidebtn" id="refreshBtn" aria-label="Refresh">&#x27F3;</button>
     </div>
 
     <div id="tabs" role="tablist" aria-label="Pages">
@@ -94,7 +95,6 @@ button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 a
         <p><span>Update available!</span></p>
         <button id="close-update-notification" aria-label="Dismiss update notification">&times;</button>
       </div>
-      <button class="sidebtn" id="refreshBtn" aria-label="Refresh">&#x27F3;</button>
       <button class="sidebtn" id="settingsBtn" aria-label="Settings">&#x2699;</button>
       <button class="sidebtn" id="powerBtn" aria-label="Power">
         <svg xmlns="http://www.w3.org/2000/svg" height="28px" viewBox="0 0 24 24" width="28px" fill="#FFFFFF">

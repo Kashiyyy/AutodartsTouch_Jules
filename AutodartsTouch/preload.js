@@ -41,6 +41,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateKeyboardStyleLive: (style) => ipcRenderer.send('update-keyboard-style-live', style),
   updateToolbarStyleLive: (style) => ipcRenderer.send('update-toolbar-style-live', style),
 
+  // App Update Management
+  getAppVersions: () => ipcRenderer.invoke('getAppVersions'),
+  updateApp: (version) => ipcRenderer.send('updateApp', version),
+  reinstallApp: (version) => ipcRenderer.send('reinstallApp', version),
+  restartApp: () => ipcRenderer.send('restartApp'),
+
   // Extension Management API
   getExtensionVersions: () => ipcRenderer.invoke('getExtensionVersions'),
   downloadExtension: () => ipcRenderer.invoke('downloadExtension'),

@@ -12,7 +12,24 @@ set -euo pipefail
 # ===================================================================================
 
 # --- Configuration
-BRANCH_NAME="${1:-main}"
+# If a branch name is provided as an argument, use it.
+# Otherwise, fetch the tag name of the latest release from GitHub.
+if [ -n "${1-}" ]; then
+  BRANCH_NAME="$1"
+  print_info "A specific branch '$BRANCH_NAME' was requested."
+else
+  print_info "No specific branch requested. Finding the latest release from GitHub..."
+  # Use curl to get the latest release, grep for the tag_name line, and cut to extract the value.
+  LATEST_TAG=$(curl -s https://api.github.com/repos/Kashiyyy/AutodartsTouch/releases/latest | grep '"tag_name":' | cut -d '"' -f 4)
+
+  if [ -z "$LATEST_TAG" ]; then
+    print_warning "Could not fetch the latest release tag. Defaulting to 'main' branch."
+    BRANCH_NAME="main"
+  else
+    BRANCH_NAME="$LATEST_TAG"
+    print_success "Latest release found: $BRANCH_NAME"
+  fi
+fi
 GITHUB_REPO_URL="https://github.com/Kashiyyy/AutodartsTouch.git"
 
 # --- Environment
@@ -22,6 +39,7 @@ APP_DIR="$HOME_DIR/AutodartsTouch"
 START_SCRIPT="$APP_DIR/AutodartsTouch.sh"
 AUTOSTART_DESKTOP_DIR="$HOME_DIR/.config/autostart"
 DESKTOP_FILE="$AUTOSTART_DESKTOP_DIR/AutodartsTouch.desktop"
+VERSION_FILE="$APP_DIR/version.json"
 
 # --- Global variables
 ROTATION_CHOICE=""
@@ -111,7 +129,7 @@ detect_package_manager
 detect_raspberry_pi
 print_info "Running as user: $GUI_USER"
 print_info "Application will be installed in: $APP_DIR"
-print_info "Installing from branch: $BRANCH_NAME"
+print_info "Installing from branch/tag: $BRANCH_NAME"
 
 # --- Step 1: System Update and Package Installation
 
@@ -208,7 +226,7 @@ REPO_NAME=$(basename "$GITHUB_REPO_URL" .git)
 CLONE_DIR="$TMP_DIR/$REPO_NAME"
 
 if ! git clone --depth 1 --branch "$BRANCH_NAME" "$GITHUB_REPO_URL" "$CLONE_DIR"; then
-  print_error "Failed to clone the repository. Please check the URL and your connection."
+  print_error "Failed to clone the repository. Please check the URL, branch/tag name, and your connection."
 fi
 
 # The application files are in the 'AutodartsTouch' subdirectory.
@@ -243,14 +261,24 @@ else
   print_error "Failed to install npm dependencies. Please check the logs."
 fi
 
-# --- Step 7: Apply System Configurations
-print_header "Step 7: Applying System Configurations"
+# --- Step 7: Storing Version Information
+print_header "Step 7: Storing Version Information"
+print_info "Creating version file at $VERSION_FILE..."
+cat > "$VERSION_FILE" <<EOL
+{
+  "version": "$BRANCH_NAME"
+}
+EOL
+print_success "Version information saved."
+
+# --- Step 8: Apply System Configurations
+print_header "Step 8: Applying System Configurations"
 
 # Hardware-specific configurations for Raspberry Pi (rotation, Argon case) have been removed.
 # The user can configure these manually if needed.
 
-# --- Step 8: Configure Autostart
-print_header "Step 8: Setting up Autostart"
+# --- Step 9: Configure Autostart
+print_header "Step 9: Setting up Autostart"
 print_info "Configuring the application to start automatically on boot."
 mkdir -p "$AUTOSTART_DESKTOP_DIR"
 cat > "$DESKTOP_FILE" <<DESK
@@ -266,8 +294,8 @@ chown "$GUI_USER:$GUI_USER" "$DESKTOP_FILE"
 chmod 644 "$DESKTOP_FILE"
 print_success "Autostart has been configured."
 
-# --- Step 9: Finalizing Setup
-print_header "Step 9: Finalizing Permissions"
+# --- Step 10: Finalizing Setup
+print_header "Step 10: Finalizing Permissions"
 chown -R "$GUI_USER:$GUI_USER" "$APP_DIR"
 chmod -R u+rwX,go+rX,go-w "$APP_DIR"
 print_success "File permissions have been set."

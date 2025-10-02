@@ -21,7 +21,35 @@ let autodartsToolsExtensionId = null;
 let availableUpdateVersion = null; // To store update info
 
 const GITHUB_REPO = 'creazy231/tools-for-autodarts';
+const APP_GITHUB_REPO = 'Kashiyyy/AutodartsTouch';
 let EXTENSION_DIR; // Will be initialized once the app is ready
+
+// Helper function to get latest app release info
+async function getLatestAppInfo() {
+  try {
+    const response = await axios.get(`https://api.github.com/repos/${APP_GITHUB_REPO}/releases/latest`);
+    // Return the raw tag name, as that's what the install script and git expect.
+    return { version: response.data.tag_name };
+  } catch (error) {
+    console.error('Failed to fetch latest app info:', error);
+    return null;
+  }
+}
+
+// Helper function to get the currently installed app version from version.json
+function getInstalledAppVersion() {
+  const versionPath = path.join(__dirname, 'version.json');
+  if (fs.existsSync(versionPath)) {
+    try {
+      const versionFile = JSON.parse(fs.readFileSync(versionPath, 'utf-8'));
+      return versionFile.version;
+    } catch (error) {
+      console.error('Failed to read or parse app version file:', error);
+      return null;
+    }
+  }
+  return null;
+}
 
 // Helper function to get latest release info (version and download URL)
 async function getLatestExtensionInfo() {
@@ -433,6 +461,53 @@ app.whenReady().then(async () => {
   EXTENSION_DIR = path.join(__dirname, 'extensions', extensionName);
 
   // Register IPC Handlers that depend on app paths
+  ipcMain.handle('getAppVersions', async () => {
+    try {
+      const installed = getInstalledAppVersion();
+      const latestInfo = await getLatestAppInfo();
+      if (!latestInfo) return { error: 'Could not fetch latest version info from GitHub.' };
+      const latest = latestInfo.version;
+      const isUpdateAvailable = installed && latest ? semver.gt(latest, installed) : false;
+      return { installed, latest, isUpdateAvailable };
+    } catch (error) {
+      console.error('IPC: getAppVersions error:', error);
+      return { error: error.message };
+    }
+  });
+
+  ipcMain.on('updateApp', (event, version) => {
+    const scriptPath = path.join(app.getAppPath(), '..', 'AutodartsTouchInstall.sh');
+    exec(`bash "${scriptPath}" "${version}"`, (error, stdout, stderr) => {
+      if (error) {
+        console.error(`Update script execution failed: ${error}`);
+        // Optionally, send a message back to the renderer process
+        settingsView.webContents.send('update-failed', stderr);
+        return;
+      }
+      // On success, restart the app
+      app.relaunch();
+      app.quit();
+    });
+  });
+
+  ipcMain.on('reinstallApp', (event, version) => {
+    const scriptPath = path.join(app.getAppPath(), '..', 'AutodartsTouchInstall.sh');
+    exec(`bash "${scriptPath}" "${version}"`, (error, stdout, stderr) => {
+      if (error) {
+        console.error(`Reinstall script execution failed: ${error}`);
+        settingsView.webContents.send('reinstall-failed', stderr);
+        return;
+      }
+      app.relaunch();
+      app.quit();
+    });
+  });
+
+  ipcMain.on('restartApp', () => {
+    app.relaunch();
+    app.quit();
+  });
+
   ipcMain.handle('getExtensionVersions', async () => {
     try {
       const installed = getInstalledExtensionVersion();
