@@ -11,6 +11,31 @@ set -euo pipefail
 #
 # ===================================================================================
 
+# --- Helper Functions
+print_header() {
+  echo
+  echo "================================================="
+  echo " $1"
+  echo "================================================="
+}
+
+print_info() {
+  echo "INFO: $1"
+}
+
+print_success() {
+  echo "SUCCESS: $1"
+}
+
+print_warning() {
+  echo "WARNING: $1"
+}
+
+print_error() {
+  echo "ERROR: $1" >&2
+  exit 1
+}
+
 # --- Configuration
 # If a branch name is provided as an argument, use it.
 # Otherwise, fetch the tag name of the latest release from GitHub.
@@ -46,31 +71,6 @@ ROTATION_CHOICE=""
 ARGON_CHOICE=""
 PACKAGE_MANAGER=""
 IS_RASPBERRY_PI=false
-
-# --- Helper Functions
-print_header() {
-  echo
-  echo "================================================="
-  echo " $1"
-  echo "================================================="
-}
-
-print_info() {
-  echo "INFO: $1"
-}
-
-print_success() {
-  echo "SUCCESS: $1"
-}
-
-print_warning() {
-  echo "WARNING: $1"
-}
-
-print_error() {
-  echo "ERROR: $1" >&2
-  exit 1
-}
 
 # --- Platform-specific Setup
 # Functions for detecting the environment and setting up platform-specific features.
