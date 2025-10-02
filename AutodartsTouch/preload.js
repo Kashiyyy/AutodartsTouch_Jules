@@ -69,30 +69,68 @@ function setCursorVisibility(visible) {
 // Show cursor on mouse move, hide on touch
 window.addEventListener('DOMContentLoaded', () => {
   // --- Custom Scrollbar Injection ---
-   const style = document.createElement('style');
-  style.textContent = `
-    html, body {
-      overflow: overlay !important;
-    }
+  const styleId = 'autodarts-touch-scrollbar-style';
+  const customScrollbarCSS = `
+    html::-webkit-scrollbar,
+    body::-webkit-scrollbar,
     *::-webkit-scrollbar {
       width: 5px !important;
       height: 5px !important;
     }
+    html::-webkit-scrollbar-track,
+    body::-webkit-scrollbar-track,
     *::-webkit-scrollbar-track {
-      background: transparent !important;
+      background: #000000 !important;
     }
+    html::-webkit-scrollbar-thumb,
+    body::-webkit-scrollbar-thumb,
     *::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.2) !important;
+      background: #888 !important;
       border-radius: 5px !important;
     }
+    html::-webkit-scrollbar-thumb:hover,
+    body::-webkit-scrollbar-thumb:hover,
     *::-webkit-scrollbar-thumb:hover {
-      background: rgba(255, 255, 255, 0.4) !important;
+      background: #aaa !important;
     }
+    html::-webkit-scrollbar-corner,
+    body::-webkit-scrollbar-corner,
     *::-webkit-scrollbar-corner {
       background: transparent !important;
     }
   `;
-  document.head.append(style);
+
+  const createOrUpdateStyleElement = () => {
+    // To prevent duplicate style tags, which cause rendering issues,
+    // we first remove the old style element if it exists.
+    const oldStyle = document.getElementById(styleId);
+    if (oldStyle) {
+      oldStyle.remove();
+    }
+
+    // Then, we create and append the new, updated style element.
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = customScrollbarCSS;
+    // Appending it to the head ensures it's applied last, giving it priority.
+    document.head.appendChild(style);
+  };
+
+  // Initial injection
+  createOrUpdateStyleElement();
+
+  // Use a MutationObserver to re-apply styles if the head is modified by the loaded page.
+  // This is crucial for external sites that might add their own conflicting styles.
+  const observer = new MutationObserver((mutations) => {
+    // To prevent infinite loops, we disconnect the observer, re-apply our style,
+    // and then reconnect the observer.
+    observer.disconnect();
+    createOrUpdateStyleElement();
+    observer.observe(document.head, { childList: true });
+  });
+
+  observer.observe(document.head, { childList: true });
+
 
   // --- Touch Scrolling ---
   let isDragging = false;
