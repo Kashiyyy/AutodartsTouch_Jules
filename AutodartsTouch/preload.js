@@ -80,7 +80,7 @@ window.addEventListener('DOMContentLoaded', () => {
     html::-webkit-scrollbar-track,
     body::-webkit-scrollbar-track,
     *::-webkit-scrollbar-track {
-      background: #000000 !important;
+      background: transparent !important;
     }
     html::-webkit-scrollbar-thumb,
     body::-webkit-scrollbar-thumb,
