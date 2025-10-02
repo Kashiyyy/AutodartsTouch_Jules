@@ -78,18 +78,19 @@ window.addEventListener('DOMContentLoaded', () => {
       width: 5px !important;
       height: 5px !important;
     }
-    html::-webkit-scrollbar-track {
+    html::-webkit-scrollbar-track,
+    html::-webkit-scrollbar-track-piece,
+    html::-webkit-scrollbar-corner {
       background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
     }
     html::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.15) !important;
+      background: rgba(255, 255, 255, 0.2) !important;
       border-radius: 5px !important;
     }
     html::-webkit-scrollbar-thumb:hover {
-      background: rgba(255, 255, 255, 0.3) !important;
-    }
-    html::-webkit-scrollbar-corner {
-      background: transparent !important;
+      background: rgba(255, 255, 255, 0.4) !important;
     }
   `;
   document.head.append(style);
