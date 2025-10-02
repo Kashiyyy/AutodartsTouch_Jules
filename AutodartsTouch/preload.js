@@ -68,6 +68,58 @@ function setCursorVisibility(visible) {
 
 // Show cursor on mouse move, hide on touch
 window.addEventListener('DOMContentLoaded', () => {
+  // --- Custom Scrollbar Injection ---
+  const styleId = 'autodarts-touch-scrollbar-style';
+  const customScrollbarCSS = `
+    html, body {
+      overflow: overlay !important;
+    }
+    *::-webkit-scrollbar {
+      width: 5px !important;
+      height: 5px !important;
+    }
+    *::-webkit-scrollbar-track {
+      background: transparent !important;
+    }
+    *::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2) !important;
+      border-radius: 5px !important;
+    }
+    *::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.4) !important;
+    }
+    *::-webkit-scrollbar-corner {
+      background: transparent !important;
+    }
+  `;
+
+  const createOrUpdateStyleElement = () => {
+    let style = document.getElementById(styleId);
+    if (!style) {
+      style = document.createElement('style');
+      style.id = styleId;
+      style.textContent = customScrollbarCSS;
+    }
+    // Ensure our style is always the last element in the head to give it priority
+    document.head.appendChild(style);
+  };
+
+  // Initial injection
+  createOrUpdateStyleElement();
+
+  // Use a MutationObserver to re-apply styles if the head is modified by the loaded page.
+  // This is crucial for external sites that might add their own conflicting styles.
+  const observer = new MutationObserver((mutations) => {
+    // To prevent infinite loops, we disconnect the observer, re-apply our style,
+    // and then reconnect the observer.
+    observer.disconnect();
+    createOrUpdateStyleElement();
+    observer.observe(document.head, { childList: true });
+  });
+
+  observer.observe(document.head, { childList: true });
+
+
   // --- Touch Scrolling ---
   let isDragging = false;
   let startY = 0;
