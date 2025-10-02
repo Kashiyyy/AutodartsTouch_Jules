@@ -281,28 +281,65 @@ print_header "Step 7: Applying System Configurations"
 
 if [ "$IS_RASPBERRY_PI" = true ]; then
   # Apply screen rotation
-  ROTATION_VALUE=""
-  case $ROTATION_CHOICE in
-    1) ROTATION_VALUE=0 ;;
-    2) ROTATION_VALUE=1 ;;
-    3) ROTATION_VALUE=2 ;;
-    4) ROTATION_VALUE=3 ;;
-  esac
+  if [ "$ROTATION_CHOICE" != "5" ] && [ -n "$ROTATION_CHOICE" ]; then
+    WAYFIRE_CONFIG_FILE="$HOME_DIR/.config/wayfire.ini"
 
-  if [ -n "$ROTATION_VALUE" ]; then
-    CONFIG_FILE="/boot/firmware/config.txt"
-    if [ ! -f "$CONFIG_FILE" ]; then
-      CONFIG_FILE="/boot/config.txt"
-    fi
-    if [ -f "$CONFIG_FILE" ]; then
-      print_info "Updating display rotation settings in $CONFIG_FILE..."
-      sed -i "/^display_hdmi_rotate=/d" "$CONFIG_FILE" 2>/dev/null || true
-      sed -i "/^display_lcd_rotate=/d" "$CONFIG_FILE" 2>/dev/null || true
-      echo "display_hdmi_rotate=$ROTATION_VALUE" >> "$CONFIG_FILE"
-      echo "display_lcd_rotate=$ROTATION_VALUE" >> "$CONFIG_FILE"
-      print_success "Screen rotation set. A reboot is required to apply the change."
+    # Check if we are in a Wayland environment by looking for wayfire.ini as the GUI_USER
+    if sudo -u "$GUI_USER" [ -f "$WAYFIRE_CONFIG_FILE" ]; then
+      print_info "Wayland environment detected, configuring rotation in $WAYFIRE_CONFIG_FILE..."
+      WAYLAND_TRANSFORM=""
+      case $ROTATION_CHOICE in
+        1) WAYLAND_TRANSFORM="normal" ;;
+        2) WAYLAND_TRANSFORM="90" ;;
+        3) WAYLAND_TRANSFORM="180" ;;
+        4) WAYLAND_TRANSFORM="270" ;;
+      esac
+
+      if [ -n "$WAYLAND_TRANSFORM" ]; then
+        # This is a best-effort attempt. It targets common display outputs.
+        for display in HDMI-A-1 HDMI-A-2 DSI-1; do
+          # Ensure the file exists and is owned by the user before manipulating it.
+          sudo -u "$GUI_USER" touch "$WAYFIRE_CONFIG_FILE"
+
+          # If the display section doesn't exist, add it with the transform.
+          if ! sudo -u "$GUI_USER" grep -q "\[output:$display\]" "$WAYFIRE_CONFIG_FILE"; then
+            echo -e "\n[output:$display]\ntransform = $WAYLAND_TRANSFORM" | sudo -u "$GUI_USER" tee -a "$WAYFIRE_CONFIG_FILE" > /dev/null
+          else
+            # If the section exists, delete any old transform and add the new one.
+            # This is safer than trying to replace in-place.
+            sudo -u "$GUI_USER" sed -i "/\[output:$display\]/,/\[/s/^\s*transform = .*$//g" "$WAYFIRE_CONFIG_FILE"
+            sudo -u "$GUI_USER" sed -i "/\[output:$display\]/a transform = $WAYLAND_TRANSFORM" "$WAYFIRE_CONFIG_FILE"
+          fi
+        done
+        print_success "Wayland screen rotation set. A reboot is required to apply the change."
+      fi
+    # Fallback to legacy method for non-Wayland (X11) environments
     else
-      print_warning "Could not find config.txt. Skipping rotation setup."
+      print_info "Legacy environment detected, configuring rotation in /boot/config.txt..."
+      LEGACY_ROTATION_VALUE=""
+      case $ROTATION_CHOICE in
+        1) LEGACY_ROTATION_VALUE=0 ;;
+        2) LEGACY_ROTATION_VALUE=1 ;;
+        3) LEGACY_ROTATION_VALUE=2 ;;
+        4) LEGACY_ROTATION_VALUE=3 ;;
+      esac
+
+      if [ -n "$LEGACY_ROTATION_VALUE" ]; then
+        CONFIG_FILE="/boot/firmware/config.txt"
+        if [ ! -f "$CONFIG_FILE" ]; then
+          CONFIG_FILE="/boot/config.txt"
+        fi
+        if [ -f "$CONFIG_FILE" ]; then
+          print_info "Updating display rotation settings in $CONFIG_FILE..."
+          sed -i "/^display_hdmi_rotate=/d" "$CONFIG_FILE" 2>/dev/null || true
+          sed -i "/^display_lcd_rotate=/d" "$CONFIG_FILE" 2>/dev/null || true
+          echo "display_hdmi_rotate=$LEGACY_ROTATION_VALUE" >> "$CONFIG_FILE"
+          echo "display_lcd_rotate=$LEGACY_ROTATION_VALUE" >> "$CONFIG_FILE"
+          print_success "Legacy screen rotation set. A reboot is required."
+        else
+          print_warning "Could not find /boot/config.txt. Skipping rotation setup."
+        fi
+      fi
     fi
   else
     print_info "Skipping screen rotation setup as requested."
