@@ -123,11 +123,6 @@ function applyGlobalCss(view) {
   if (!view || !view.webContents || view.webContents.isDestroyed()) return;
 
   const css = `
-    /* Canary for debugging */
-    body {
-      border: 10px solid red !important;
-    }
-
     /* Disable text selection */
     html, body {
       -webkit-user-select: none !important;
@@ -138,22 +133,22 @@ function applyGlobalCss(view) {
       user-select: auto !important;
     }
 
-    /* Custom Scrollbar Styles */
-    ::-webkit-scrollbar {
+    /* Custom Scrollbar Styles - with increased specificity */
+    *::-webkit-scrollbar {
       width: 5px !important;
       height: 5px !important;
     }
-    ::-webkit-scrollbar-track {
+    *::-webkit-scrollbar-track {
       background: transparent !important;
     }
-    ::-webkit-scrollbar-thumb {
+    *::-webkit-scrollbar-thumb {
       background: rgba(255, 255, 255, 0.3) !important;
       border-radius: 5px !important;
     }
-    ::-webkit-scrollbar-thumb:hover {
+    *::-webkit-scrollbar-thumb:hover {
       background: rgba(255, 255, 255, 0.5) !important;
     }
-    ::-webkit-scrollbar-corner {
+    *::-webkit-scrollbar-corner {
       background: transparent !important;
     }
   `;
