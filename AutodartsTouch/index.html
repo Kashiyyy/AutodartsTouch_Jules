@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>Kiosk Toolbar</title>
+<title>AutodartsTouch Toolbar</title>
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <link href="https://fonts.googleapis.com/css2?family=Open+Sans&display=swap" rel="stylesheet">
 <style>
@@ -80,7 +80,7 @@ button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 a
 </style>
 </head>
 <body>
-  <div id="toolbar" role="toolbar" aria-label="Kiosk Controls">
+  <div id="toolbar" role="toolbar" aria-label="AutodartsTouch Controls">
     <div style="display:flex;align-items:center;justify-content:center;height:100%;">
       <button class="sidebtn" id="webVKBtn" aria-label="Web Keyboard">&#x2328;</button>
     </div>
@@ -158,7 +158,6 @@ button[aria-selected="true"]::after{content:"";display:block;margin:2px auto 0 a
     // Listen for notifications from the main process to update the active tab.
     if (window.api && window.api.on) {
       window.api.on('active-view-changed', (activeViewId) => {
-        console.log(`Toolbar received active-view-changed event: ${activeViewId}`);
         updateActiveTab();
       });
 

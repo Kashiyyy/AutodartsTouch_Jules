@@ -26,11 +26,7 @@ contextBridge.exposeInMainWorld('api', {
   getCurrentView: () => ipcRenderer.invoke('get-current-view'),
   sendKey: (key) => ipcRenderer.send('webkeyboard-key', key),
   setShiftStatus: (isActive) => ipcRenderer.send('keyboard-shift-status', isActive),
-  reportKeyboardHeight: (height) => ipcRenderer.send('keyboard-height-changed', height),
-  testAutoFocus: () => {
-    console.log('?? Manual test trigger');
-    ipcRenderer.send('input-focused');
-  }
+  reportKeyboardHeight: (height) => ipcRenderer.send('keyboard-height-changed', height)
 });
 
 // API for settings and other webviews

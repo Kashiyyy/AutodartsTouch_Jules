@@ -113,40 +113,7 @@ print_info "Running as user: $GUI_USER"
 print_info "Application will be installed in: $APP_DIR"
 print_info "Installing from branch: $BRANCH_NAME"
 
-# --- Step 1: Gather All User Input
-print_header "Step 1: Configuration Questions"
-
-# Ask about screen rotation
-configure_rotation() {
-  echo
-  echo "Please choose your screen orientation from the options below."
-  echo "This setting is for the physical display connected to your Raspberry Pi."
-  echo
-  echo "  1) Normal         (0 degrees, standard landscape)"
-  echo "  2) Right-side up  (90 degrees, portrait)"
-  echo "  3) Upside down    (180 degrees, inverted landscape)"
-  echo "  4) Left-side up   (270 degrees, portrait)"
-  echo "  5) Skip           (Do not change rotation)"
-  echo
-
-  read -p "Enter your choice for screen rotation [1-5]: " ROTATION_CHOICE < /dev/tty
-}
-
-# Ask about Argon One case
-configure_argon_one() {
-  echo
-  echo "This optional step enables the additional USB-A ports on the"
-  echo "Argon One V5 case by modifying the boot configuration."
-  echo
-
-  read -p "Do you have an Argon One V5 case and want to enable the extra USB ports? (y/N): " ARGON_CHOICE < /dev/tty
-}
-
-# Call the functions to gather input
-if [ "$IS_RASPBERRY_PI" = true ]; then
-  configure_rotation
-  configure_argon_one
-fi
+# --- Step 1: System Update and Package Installation
 
 # --- Step 2: System Update and Package Installation
 print_header "Step 2: Installing System Dependencies"
@@ -279,62 +246,8 @@ fi
 # --- Step 7: Apply System Configurations
 print_header "Step 7: Applying System Configurations"
 
-if [ "$IS_RASPBERRY_PI" = true ]; then
-  # Apply screen rotation
-  ROTATION_VALUE=""
-  case $ROTATION_CHOICE in
-    1) ROTATION_VALUE=0 ;;
-    2) ROTATION_VALUE=1 ;;
-    3) ROTATION_VALUE=2 ;;
-    4) ROTATION_VALUE=3 ;;
-  esac
-
-  if [ -n "$ROTATION_VALUE" ]; then
-    CONFIG_FILE="/boot/firmware/config.txt"
-    if [ ! -f "$CONFIG_FILE" ]; then
-      CONFIG_FILE="/boot/config.txt"
-    fi
-    if [ -f "$CONFIG_FILE" ]; then
-      print_info "Updating display rotation settings in $CONFIG_FILE..."
-      sed -i "/^display_hdmi_rotate=/d" "$CONFIG_FILE" 2>/dev/null || true
-      sed -i "/^display_lcd_rotate=/d" "$CONFIG_FILE" 2>/dev/null || true
-      echo "display_hdmi_rotate=$ROTATION_VALUE" >> "$CONFIG_FILE"
-      echo "display_lcd_rotate=$ROTATION_VALUE" >> "$CONFIG_FILE"
-      print_success "Screen rotation set. A reboot is required to apply the change."
-    else
-      print_warning "Could not find config.txt. Skipping rotation setup."
-    fi
-  else
-    print_info "Skipping screen rotation setup as requested."
-  fi
-
-  # Apply Argon One config
-  case "$ARGON_CHOICE" in
-    [yY]|[yY][eE][sS])
-      CONFIG_FILE="/boot/firmware/config.txt"
-      if [ ! -f "$CONFIG_FILE" ]; then
-        CONFIG_FILE="/boot/config.txt"
-      fi
-      if [ -f "$CONFIG_FILE" ]; then
-        argon_line="dtoverlay=dwc2,dr_mode=host"
-        if grep -q "^${argon_line}" "$CONFIG_FILE"; then
-          print_info "Argon One V5 setting already exists. No changes needed."
-        else
-          print_info "Enabling Argon One V5 USB ports..."
-          echo "$argon_line" >> "$CONFIG_FILE"
-          print_success "Argon One V5 USB ports enabled. A reboot is required."
-        fi
-      else
-        print_warning "Could not find config.txt. Skipping Argon One setup."
-      fi
-      ;;
-    *)
-      print_info "Skipping Argon One V5 case setup as requested."
-      ;;
-  esac
-else
-  print_info "Skipping all hardware-specific configurations."
-fi
+# Hardware-specific configurations for Raspberry Pi (rotation, Argon case) have been removed.
+# The user can configure these manually if needed.
 
 # --- Step 8: Configure Autostart
 print_header "Step 8: Setting up Autostart"
