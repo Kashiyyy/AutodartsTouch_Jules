@@ -82,11 +82,11 @@ window.addEventListener('DOMContentLoaded', () => {
       background: transparent !important;
     }
     html::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.2) !important;
+      background: rgba(255, 255, 255, 0.15) !important;
       border-radius: 5px !important;
     }
     html::-webkit-scrollbar-thumb:hover {
-      background: rgba(255, 255, 255, 0.4) !important;
+      background: rgba(255, 255, 255, 0.3) !important;
     }
     html::-webkit-scrollbar-corner {
       background: transparent !important;
