@@ -489,32 +489,53 @@ app.whenReady().then(async () => {
     }
   });
 
+  async function runUpdateScript(version) {
+    const scriptUrl = `https://raw.githubusercontent.com/${APP_GITHUB_REPO}/main/AutodartsTouchInstall.sh`;
+    const tempScriptPath = path.join(require('os').tmpdir(), 'AutodartsTouchInstall.sh');
+
+    try {
+      // Download the script
+      const response = await axios({
+        url: scriptUrl,
+        method: 'GET',
+        responseType: 'stream',
+      });
+
+      const writer = fs.createWriteStream(tempScriptPath);
+      response.data.pipe(writer);
+
+      await new Promise((resolve, reject) => {
+        writer.on('finish', resolve);
+        writer.on('error', reject);
+      });
+
+      // Make the script executable
+      fs.chmodSync(tempScriptPath, '755');
+
+      // Execute the script
+      exec(`bash "${tempScriptPath}" "${version}"`, (error, stdout, stderr) => {
+        if (error) {
+          console.error(`Update script execution failed: ${error}`);
+          settingsView.webContents.send('update-failed', stderr);
+          return;
+        }
+        // On success, restart the app
+        app.relaunch();
+        app.quit();
+      });
+
+    } catch (error) {
+      console.error('Failed to download or execute update script:', error);
+      settingsView.webContents.send('update-failed', 'Failed to download update script.');
+    }
+  }
+
   ipcMain.on('updateApp', (event, version) => {
-    const scriptPath = path.join(app.getAppPath(), '..', 'AutodartsTouchInstall.sh');
-    exec(`bash "${scriptPath}" "${version}"`, (error, stdout, stderr) => {
-      if (error) {
-        console.error(`Update script execution failed: ${error}`);
-        // Optionally, send a message back to the renderer process
-        settingsView.webContents.send('update-failed', stderr);
-        return;
-      }
-      // On success, restart the app
-      app.relaunch();
-      app.quit();
-    });
+    runUpdateScript(version);
   });
 
   ipcMain.on('reinstallApp', (event, version) => {
-    const scriptPath = path.join(app.getAppPath(), '..', 'AutodartsTouchInstall.sh');
-    exec(`bash "${scriptPath}" "${version}"`, (error, stdout, stderr) => {
-      if (error) {
-        console.error(`Reinstall script execution failed: ${error}`);
-        settingsView.webContents.send('reinstall-failed', stderr);
-        return;
-      }
-      app.relaunch();
-      app.quit();
-    });
+    runUpdateScript(version);
   });
 
   ipcMain.on('restartApp', () => {
