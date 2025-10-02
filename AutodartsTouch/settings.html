@@ -429,7 +429,8 @@
         if (versions.error) {
             appUpdateMessageSpan.textContent = `Error: ${versions.error}`;
             appUpdateMessageSpan.style.color = '#ff6b6b';
-            currentAppVersionSpan.textContent = 'Unknown';
+            // If an error occurs, still try to display the installed version if it was returned.
+            currentAppVersionSpan.textContent = versions.installed || 'Unknown';
             latestAppVersionSpan.textContent = 'Unknown';
             reinstallAppBtn.style.display = 'inline-block'; // Allow reinstall even if check fails
             return;
