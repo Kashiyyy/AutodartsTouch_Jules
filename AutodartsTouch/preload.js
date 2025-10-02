@@ -71,6 +71,9 @@ window.addEventListener('DOMContentLoaded', () => {
   // --- Custom Scrollbar Injection ---
   const style = document.createElement('style');
   style.textContent = `
+    html, body {
+      overflow: overlay !important;
+    }
     *::-webkit-scrollbar {
       width: 5px !important;
       height: 5px !important;
