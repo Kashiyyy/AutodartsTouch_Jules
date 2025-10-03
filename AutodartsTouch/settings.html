@@ -227,7 +227,7 @@
             <p>Installed: <span id="current-app-version">...</span> | Latest: <span id="latest-app-version">...</span></p>
             <p>Status: <span id="app-update-message" style="color: #f0ad4e;"></span></p>
         </div>
-        <div class="extension-action-col" style="text-align: center;">
+        <div id="app-action-col" class="extension-action-col" style="text-align: center;">
             <button id="update-app-btn" style="display: none;">Update</button>
             <button id="reinstall-app-btn" style="display: none;">Reinstall</button>
         </div>
@@ -493,13 +493,10 @@
         restartBtn.style.backgroundColor = '#5cb85c';
         restartBtn.style.display = 'inline-block';
 
-        const actionCol = document.querySelector('.extension-action-col');
-        const existingButton = actionCol.querySelector('button');
-        if (existingButton) {
-            existingButton.parentElement.replaceChild(restartBtn, existingButton);
-        } else {
-            actionCol.appendChild(restartBtn);
-        }
+        const actionCol = document.getElementById('app-action-col');
+        // Clear any existing buttons (like 'Update' or 'Reinstall')
+        actionCol.innerHTML = '';
+        actionCol.appendChild(restartBtn);
 
         restartBtn.addEventListener('click', () => {
           restartBtn.textContent = 'Restarting...';
