@@ -2,7 +2,7 @@ const { app, BrowserWindow, BrowserView, ipcMain, screen, session, shell, dialog
 const path = require('path');
 const fs = require('fs');
 const Store = require('electron-store');
-const { exec } = require('child_process');
+const { exec, spawn } = require('child_process');
 const axios = require('axios');
 const unzipper = require('unzipper');
 const semver = require('semver');
@@ -515,14 +515,24 @@ app.whenReady().then(async () => {
     runUpdateScript(version);
   });
 
-  ipcMain.on('reboot-system', () => {
-    exec('reboot', (err) => {
-      if (err) {
-        console.error('Reboot command failed:', err);
-        // Inform the user if the command fails
-        settingsView.webContents.send('reboot-failed', 'Reboot command failed. Please reboot manually.');
-      }
+  ipcMain.on('restartApp', () => {
+    const scriptPath = path.join(__dirname, 'AutodartsTouch.sh');
+
+    try {
+      fs.chmodSync(scriptPath, '755');
+    } catch (error) {
+      console.error(`Failed to set permissions on restart script: ${error}`);
+      return;
+    }
+
+    console.log(`Relaunching with script: ${scriptPath}`);
+    const child = spawn('bash', [scriptPath], {
+      detached: true,
+      stdio: 'inherit'
     });
+    child.unref();
+
+    app.quit();
   });
 
   ipcMain.handle('getExtensionVersions', async () => {
@@ -557,7 +567,7 @@ app.whenReady().then(async () => {
           }
         }
         if (toolbarView && toolbarView.webContents && !toolbarView.webContents.isDestroyed()) {
-          toolbarView.webContents.send('update-installed');
+          toolbarView.webContents.send('update-installed', { type: 'extension' });
         }
       }
       return { success };
@@ -826,24 +836,37 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', () => app.quit());
 
 async function checkForUpdatesAndNotifyToolbar() {
-  const isExtensionEnabled = store.get('enableExtension', false);
-
-  if (!isExtensionEnabled) {
-    return;
-  }
-
-  try {
-    const installedVersion = getInstalledExtensionVersion();
-    const latestInfo = await getLatestExtensionInfo();
-
-    if (installedVersion && latestInfo && latestInfo.version) {
-      if (semver.gt(latestInfo.version, installedVersion)) {
-        if (toolbarView && toolbarView.webContents && !toolbarView.webContents.isDestroyed()) {
-          toolbarView.webContents.send('update-available', 'Tools for Autodarts has a new update.');
+    // Check for main application updates
+    try {
+        const installed = getInstalledAppVersion();
+        const latestInfo = await getLatestAppInfo();
+        if (latestInfo && latestInfo.version && installed) {
+            if (installed !== latestInfo.version) {
+                if (toolbarView && toolbarView.webContents && !toolbarView.webContents.isDestroyed()) {
+                    toolbarView.webContents.send('update-available', { type: 'app', message: 'AutodartsTouch has a new update.' });
+                }
+            }
         }
-      }
+    } catch (error) {
+        console.error('An error occurred during the startup app update check:', error);
     }
-  } catch (error) {
-    console.error('An error occurred during the startup update check:', error);
-  }
+
+    // Check for extension updates
+    const isExtensionEnabled = store.get('enableExtension', false);
+    if (isExtensionEnabled) {
+        try {
+            const installedVersion = getInstalledExtensionVersion();
+            const latestInfo = await getLatestExtensionInfo();
+
+            if (installedVersion && latestInfo && latestInfo.version) {
+                if (semver.gt(latestInfo.version, installedVersion)) {
+                    if (toolbarView && toolbarView.webContents && !toolbarView.webContents.isDestroyed()) {
+                        toolbarView.webContents.send('update-available', { type: 'extension', message: 'Tools for Autodarts has a new update.' });
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('An error occurred during the startup extension update check:', error);
+        }
+    }
 }

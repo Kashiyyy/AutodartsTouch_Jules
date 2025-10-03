@@ -227,7 +227,7 @@
             <p>Installed: <span id="current-app-version">...</span> | Latest: <span id="latest-app-version">...</span></p>
             <p>Status: <span id="app-update-message" style="color: #f0ad4e;"></span></p>
         </div>
-        <div class="extension-action-col" style="text-align: center;">
+        <div id="app-action-col" class="extension-action-col" style="text-align: center;">
             <button id="update-app-btn" style="display: none;">Update</button>
             <button id="reinstall-app-btn" style="display: none;">Reinstall</button>
         </div>
@@ -482,24 +482,26 @@
     // Listen for events from the main process about the update status
     if (window.electronAPI && window.electronAPI.on) {
       window.electronAPI.on('update-successful', () => {
-        appUpdateMessageSpan.textContent = 'Update successful! A system reboot is required to complete the installation.';
-        appUpdateMessageSpan.style.color = '#4caf50'; // Green for success
+        appUpdateMessageSpan.textContent = 'Update successful! Please restart the application to complete the installation.';
+        appUpdateMessageSpan.style.color = '#4caf50';
 
         updateAppBtn.style.display = 'none';
+        reinstallAppBtn.style.display = 'none';
 
-        const rebootBtn = reinstallAppBtn;
-        rebootBtn.textContent = 'Reboot System';
-        rebootBtn.style.backgroundColor = '#5cb85c';
-        rebootBtn.style.display = 'inline-block';
-        rebootBtn.disabled = false;
+        const restartBtn = document.createElement('button');
+        restartBtn.textContent = 'Restart App';
+        restartBtn.style.backgroundColor = '#5cb85c';
+        restartBtn.style.display = 'inline-block';
 
-        const newRebootBtn = rebootBtn.cloneNode(true);
-        rebootBtn.parentNode.replaceChild(newRebootBtn, rebootBtn);
+        const actionCol = document.getElementById('app-action-col');
+        // Clear any existing buttons (like 'Update' or 'Reinstall')
+        actionCol.innerHTML = '';
+        actionCol.appendChild(restartBtn);
 
-        newRebootBtn.addEventListener('click', () => {
-          newRebootBtn.textContent = 'Rebooting...';
-          newRebootBtn.disabled = true;
-          if (window.electronAPI) window.electronAPI.rebootSystem();
+        restartBtn.addEventListener('click', () => {
+          restartBtn.textContent = 'Restarting...';
+          restartBtn.disabled = true;
+          if (window.electronAPI) window.electronAPI.restartApp();
         });
       });
 
