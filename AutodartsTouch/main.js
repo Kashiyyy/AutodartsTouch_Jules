@@ -469,10 +469,15 @@ app.whenReady().then(async () => {
       const latest = latestInfo.version;
 
       let isUpdateAvailable = false;
-      // Per user instruction, if the installed version does not exactly match the
-      // latest version tag, an update is considered available.
-      if (latest && installed) {
-        isUpdateAvailable = installed !== latest;
+      // If the latest version is valid and the installed version is not,
+      // consider an update available (e.g., from 'main' to a release).
+      if (semver.valid(latest)) {
+        if (!semver.valid(installed)) {
+          isUpdateAvailable = true;
+        } else {
+          // Both are valid, so compare them.
+          isUpdateAvailable = semver.gt(latest, installed);
+        }
       }
 
       return { installed, latest, isUpdateAvailable };
