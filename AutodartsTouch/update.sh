@@ -16,6 +16,9 @@ DOWNLOAD_TAG="${VERSION_TO_INSTALL:-main}"
 INSTALLER_URL="https://raw.githubusercontent.com/Kashiyyy/AutodartsTouch/${DOWNLOAD_TAG}/AutodartsTouchInstall.sh"
 TEMP_INSTALLER="/tmp/AutodartsTouchInstall.sh"
 
+# Ensure the temporary installer is cleaned up when the script exits.
+trap 'rm -f "$TEMP_INSTALLER"' EXIT
+
 echo "--- Starting AutodartsTouch Update ---"
 echo "Target version/branch: ${VERSION_TO_INSTALL:-"Latest Release"}"
 
