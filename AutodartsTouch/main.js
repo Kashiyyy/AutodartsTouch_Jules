@@ -516,6 +516,10 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.on('restartApp', () => {
+    // Destroy all windows before quitting to ensure a clean exit
+    BrowserWindow.getAllWindows().forEach(win => {
+        win.destroy();
+    });
     app.relaunch();
     app.quit();
   });
