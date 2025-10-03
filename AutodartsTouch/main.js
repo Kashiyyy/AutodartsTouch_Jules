@@ -516,22 +516,29 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.on('restartApp', () => {
-    const scriptPath = path.join(__dirname, 'AutodartsTouch.sh');
+    const scriptPath = path.join(__dirname, 'restart.sh');
 
     try {
-      fs.chmodSync(scriptPath, '755');
+        // Make sure the restart script is executable
+        fs.chmodSync(scriptPath, '755');
     } catch (error) {
-      console.error(`Failed to set permissions on restart script: ${error}`);
-      return;
+        console.error(`Failed to set permissions on restart script: ${error}`);
+        // Optionally notify the frontend of the failure
+        return;
     }
 
-    console.log(`Relaunching with script: ${scriptPath}`);
-    const child = spawn('bash', [scriptPath], {
-      detached: true,
-      stdio: 'inherit'
+    console.log(`Spawning restart script: ${scriptPath}`);
+    // Spawn the script in a detached process, ignoring its I/O.
+    // This allows the parent (our app) to quit immediately without waiting for the child.
+    const child = spawn(scriptPath, [], {
+        detached: true,
+        stdio: 'ignore' // Use 'ignore' to completely detach from the child's stdio
     });
+
+    // Unreference the child process, allowing the parent to exit independently
     child.unref();
 
+    // Now, quit the application
     app.quit();
   });
 
