@@ -200,8 +200,8 @@ function createDynamicViews() {
   const loadingPromises = [];
 
   const tabs = store.get('tabs', [
-    { name: '0.1', url: 'https://play.autodarts.io/' },
-    { name: 'Test', url: 'http://localhost:3180/' }
+    { name: 'Autodarts', url: 'https://play.autodarts.io/' },
+    { name: 'Service', url: 'http://localhost:3180/' }
   ]);
   tabs.forEach((tab, index) => {
     if (tab && tab.url && tab.url.trim() !== '') {
