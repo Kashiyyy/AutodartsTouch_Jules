@@ -478,6 +478,47 @@
         }
     });
 
+    // Listen for events from the main process about the update status
+    if (window.electronAPI && window.electronAPI.on) {
+      window.electronAPI.on('update-successful', () => {
+        appUpdateMessageSpan.textContent = 'Update successful! A system reboot is required to complete the installation.';
+        appUpdateMessageSpan.style.color = '#4caf50'; // Green for success
+
+        updateAppBtn.style.display = 'none';
+
+        const rebootBtn = reinstallAppBtn;
+        rebootBtn.textContent = 'Reboot System';
+        rebootBtn.style.backgroundColor = '#5cb85c';
+        rebootBtn.style.display = 'inline-block';
+        rebootBtn.disabled = false;
+
+        const newRebootBtn = rebootBtn.cloneNode(true);
+        rebootBtn.parentNode.replaceChild(newRebootBtn, rebootBtn);
+
+        newRebootBtn.addEventListener('click', () => {
+          newRebootBtn.textContent = 'Rebooting...';
+          newRebootBtn.disabled = true;
+          if (window.electronAPI) window.electronAPI.rebootSystem();
+        });
+      });
+
+      window.electronAPI.on('update-failed', (errorMessage) => {
+        appUpdateMessageSpan.textContent = `Update failed: ${errorMessage || 'Unknown error'}. Please check logs.`;
+        appUpdateMessageSpan.style.color = '#ff6b6b';
+        updateAppVersionStatus(); // Refresh to reset buttons
+      });
+
+      window.electronAPI.on('reboot-failed', (errorMessage) => {
+        appUpdateMessageSpan.textContent = `Reboot failed: ${errorMessage || 'Please reboot manually.'}`;
+        appUpdateMessageSpan.style.color = '#ff6b6b';
+        const rebootBtn = document.getElementById('reinstall-app-btn');
+        if (rebootBtn) {
+          rebootBtn.textContent = 'Reboot System';
+          rebootBtn.disabled = false;
+        }
+      });
+    }
+
     async function loadInitialData() {
       if (!window.electronAPI) return;
 

@@ -509,9 +509,8 @@ app.whenReady().then(async () => {
         settingsView.webContents.send('update-failed', stderr);
         return;
       }
-      // The update script will handle the rest. The app will be restarted by the installer.
-      // We just quit this instance.
-      app.quit();
+      // On success, notify the settings window.
+      settingsView.webContents.send('update-successful');
     });
   }
 
@@ -523,9 +522,14 @@ app.whenReady().then(async () => {
     runUpdateScript(version);
   });
 
-  ipcMain.on('restartApp', () => {
-    app.relaunch();
-    app.quit();
+  ipcMain.on('reboot-system', () => {
+    exec('reboot', (err) => {
+      if (err) {
+        console.error('Reboot command failed:', err);
+        // Inform the user if the command fails
+        settingsView.webContents.send('reboot-failed', 'Reboot command failed. Please reboot manually.');
+      }
+    });
   });
 
   ipcMain.handle('getExtensionVersions', async () => {
