@@ -516,11 +516,22 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.on('restartApp', () => {
-    // Destroy all windows before quitting to ensure a clean exit
-    BrowserWindow.getAllWindows().forEach(win => {
-        win.destroy();
-    });
-    app.relaunch();
+    const scriptPath = path.join(__dirname, 'AutodartsTouch.sh');
+
+    // Make sure the script is executable
+    try {
+      fs.chmodSync(scriptPath, '755');
+    } catch (error) {
+      console.error(`Failed to set permissions on restart script: ${error}`);
+      // Optionally, send an error back to the renderer process
+      return;
+    }
+
+    // Spawn the script as a detached process
+    const child = exec(`bash "${scriptPath}"`, { detached: true, stdio: 'ignore' });
+    child.unref();
+
+    // Quit the current application
     app.quit();
   });
 
