@@ -10,20 +10,9 @@ cd /tmp || exit 1
 
 VERSION_TO_INSTALL="${1-}" # Default to empty if no argument is provided
 
-# If a version is specified, use it as the download source.
-# Otherwise, fetch the tag name of the latest release from GitHub.
-if [ -n "$VERSION_TO_INSTALL" ]; then
-    DOWNLOAD_TAG="$VERSION_TO_INSTALL"
-else
-    echo "INFO: No specific version provided. Fetching latest release from GitHub..."
-    LATEST_TAG=$(curl -s https://api.github.com/repos/Kashiyyy/AutodartsTouch/releases/latest | grep '"tag_name":' | cut -d '"' -f 4)
-
-    if [ -z "$LATEST_TAG" ]; then
-        echo "ERROR: Could not fetch the latest release tag from GitHub. Cannot proceed." >&2
-        exit 1
-    fi
-    DOWNLOAD_TAG="$LATEST_TAG"
-fi
+# If a version is specified, use it to download the corresponding installer.
+# Otherwise, default to the main branch to get the latest installer.
+DOWNLOAD_TAG="${VERSION_TO_INSTALL:-main}"
 INSTALLER_URL="https://raw.githubusercontent.com/Kashiyyy/AutodartsTouch/${DOWNLOAD_TAG}/AutodartsTouchInstall.sh"
 TEMP_INSTALLER="/tmp/AutodartsTouchInstall.sh"
 

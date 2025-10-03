@@ -442,14 +442,13 @@
         if (versions.isUpdateAvailable) {
             appUpdateMessageSpan.textContent = 'An update is available.';
             appUpdateMessageSpan.style.color = '#f0ad4e';
-            updateAppBtn.textContent = `Update to ${versions.latest}`;
+            updateAppBtn.textContent = `Update to v${versions.latest}`;
             updateAppBtn.style.display = 'inline-block';
-            reinstallAppBtn.style.display = 'none';
+            reinstallAppBtn.style.display = 'inline-block';
         } else {
             appUpdateMessageSpan.textContent = 'You have the latest version.';
-            appUpdateMessageSpan.style.color = '#4caf50';
+            appUpdateMessageSpan.style.color = '#4caf50'; // Green for up-to-date
             reinstallAppBtn.style.display = 'inline-block';
-            updateAppBtn.style.display = 'none';
         }
     }
 
