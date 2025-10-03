@@ -9,14 +9,18 @@ cd /tmp || exit 1
 # ensuring that the application can reliably trigger its own update.
 
 VERSION_TO_INSTALL="${1-}" # Default to empty if no argument is provided
-INSTALLER_URL="https://raw.githubusercontent.com/Kashiyyy/AutodartsTouch/main/AutodartsTouchInstall.sh"
+
+# If a version is specified, use it to download the corresponding installer.
+# Otherwise, default to the main branch to get the latest installer.
+DOWNLOAD_TAG="${VERSION_TO_INSTALL:-main}"
+INSTALLER_URL="https://raw.githubusercontent.com/Kashiyyy/AutodartsTouch/${DOWNLOAD_TAG}/AutodartsTouchInstall.sh"
 TEMP_INSTALLER="/tmp/AutodartsTouchInstall.sh"
 
 echo "--- Starting AutodartsTouch Update ---"
 echo "Target version/branch: ${VERSION_TO_INSTALL:-"Latest Release"}"
 
-# Download the latest installer script from the main branch
-echo "Downloading the latest installer from GitHub..."
+# Download the installer script from the appropriate branch/tag
+echo "Downloading installer from tag/branch: ${DOWNLOAD_TAG}..."
 if ! curl -fsSL "$INSTALLER_URL" -o "$TEMP_INSTALLER"; then
     echo "ERROR: Failed to download the installer script. Please check your internet connection."
     exit 1
