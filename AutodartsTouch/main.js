@@ -489,45 +489,30 @@ app.whenReady().then(async () => {
     }
   });
 
-  async function runUpdateScript(version) {
-    const scriptUrl = `https://raw.githubusercontent.com/${APP_GITHUB_REPO}/main/AutodartsTouchInstall.sh`;
-    const tempScriptPath = path.join(require('os').tmpdir(), 'AutodartsTouchInstall.sh');
+  function runUpdateScript(version) {
+    // This script is now part of the application bundle.
+    const scriptPath = path.join(__dirname, 'update.sh');
 
+    // Ensure the script is executable, as permissions might be lost.
     try {
-      // Download the script
-      const response = await axios({
-        url: scriptUrl,
-        method: 'GET',
-        responseType: 'stream',
-      });
-
-      const writer = fs.createWriteStream(tempScriptPath);
-      response.data.pipe(writer);
-
-      await new Promise((resolve, reject) => {
-        writer.on('finish', resolve);
-        writer.on('error', reject);
-      });
-
-      // Make the script executable
-      fs.chmodSync(tempScriptPath, '755');
-
-      // Execute the script
-      exec(`bash "${tempScriptPath}" "${version}"`, (error, stdout, stderr) => {
-        if (error) {
-          console.error(`Update script execution failed: ${error}`);
-          settingsView.webContents.send('update-failed', stderr);
-          return;
-        }
-        // On success, restart the app
-        app.relaunch();
-        app.quit();
-      });
-
+      fs.chmodSync(scriptPath, '755');
     } catch (error) {
-      console.error('Failed to download or execute update script:', error);
-      settingsView.webContents.send('update-failed', 'Failed to download update script.');
+      console.error(`Failed to set permissions on update script: ${error}`);
+      settingsView.webContents.send('update-failed', 'Failed to set permissions on update script.');
+      return;
     }
+
+    // Execute the local update script, passing the target version as an argument.
+    exec(`bash "${scriptPath}" "${version || ''}"`, (error, stdout, stderr) => {
+      if (error) {
+        console.error(`Update script execution failed: ${error}`);
+        settingsView.webContents.send('update-failed', stderr);
+        return;
+      }
+      // The update script will handle the rest. The app will be restarted by the installer.
+      // We just quit this instance.
+      app.quit();
+    });
   }
 
   ipcMain.on('updateApp', (event, version) => {
