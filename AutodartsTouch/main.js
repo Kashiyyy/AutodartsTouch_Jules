@@ -515,14 +515,9 @@ app.whenReady().then(async () => {
     runUpdateScript(version);
   });
 
-  ipcMain.on('reboot-system', () => {
-    exec('reboot', (err) => {
-      if (err) {
-        console.error('Reboot command failed:', err);
-        // Inform the user if the command fails
-        settingsView.webContents.send('reboot-failed', 'Reboot command failed. Please reboot manually.');
-      }
-    });
+  ipcMain.on('restartApp', () => {
+    app.relaunch();
+    app.quit();
   });
 
   ipcMain.handle('getExtensionVersions', async () => {
