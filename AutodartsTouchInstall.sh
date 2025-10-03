@@ -139,15 +139,15 @@ print_header "Step 2: Installing System Dependencies"
 declare -a packages
 case "$PACKAGE_MANAGER" in
   apt)
-    packages=("curl" "git" "build-essential" "alsa-utils")
+    packages=("curl" "git" "unzip" "build-essential" "alsa-utils")
     ;;
   dnf|yum)
     # For Fedora/CentOS, 'Development Tools' group is equivalent to build-essential
-    packages=("curl" "git" "@development-tools" "alsa-utils")
+    packages=("curl" "git" "unzip" "@development-tools" "alsa-utils")
     ;;
   pacman)
     # For Arch, base-devel group is equivalent to build-essential
-    packages=("curl" "git" "base-devel" "alsa-utils")
+    packages=("curl" "git" "unzip" "base-devel" "alsa-utils")
     ;;
   *)
     print_error "Package name translation not configured for $PACKAGE_MANAGER."
@@ -216,40 +216,60 @@ fi
 
 # --- Step 5: Download Autodarts Touch Application
 print_header "Step 5: Downloading Autodarts Touch Files"
-
-# Change to a safe directory before deleting the application directory to avoid CWD errors.
-print_info "Changing to temporary directory..."
 cd /tmp
-
-# Clean up old directory
 rm -rf "$APP_DIR"
 
-print_info "Cloning repository to a new temporary directory..."
-TMP_DIR=$(mktemp -d)
-# The repo name is derived from the URL, e.g., "AutodartsTouch_Jules"
-REPO_NAME=$(basename "$GITHUB_REPO_URL" .git)
-CLONE_DIR="$TMP_DIR/$REPO_NAME"
+# If a branch name was provided as an argument, clone that specific branch.
+if [ -n "${1-}" ]; then
+    print_info "Cloning branch '$BRANCH_NAME' from repository..."
+    TMP_DIR=$(mktemp -d)
+    REPO_NAME=$(basename "$GITHUB_REPO_URL" .git)
+    CLONE_DIR="$TMP_DIR/$REPO_NAME"
 
-if ! git clone --depth 1 --branch "$BRANCH_NAME" "$GITHUB_REPO_URL" "$CLONE_DIR"; then
-  print_error "Failed to clone the repository. Please check the URL, branch/tag name, and your connection."
+    if ! git clone --depth 1 --branch "$BRANCH_NAME" "$GITHUB_REPO_URL" "$CLONE_DIR"; then
+        print_error "Failed to clone the repository."
+    fi
+
+    SOURCE_SUBDIR="$CLONE_DIR/AutodartsTouch"
+    if [ ! -d "$SOURCE_SUBDIR" ]; then
+        print_error "The 'AutodartsTouch' subdirectory was not found in the repository."
+    fi
+
+    print_info "Moving application files to $APP_DIR..."
+    mv "$SOURCE_SUBDIR" "$APP_DIR"
+    rm -rf "$TMP_DIR"
+
+# If no branch name was provided, download the latest release as a zip file.
+else
+    print_info "Downloading latest release source code..."
+    ZIP_URL=$(curl -s https://api.github.com/repos/Kashiyyy/AutodartsTouch/releases/latest | grep '"zipball_url":' | cut -d '"' -f 4)
+    if [ -z "$ZIP_URL" ]; then
+        print_error "Could not determine the download URL for the latest release."
+    fi
+
+    TEMP_ZIP="/tmp/source.zip"
+    if ! curl -L "$ZIP_URL" -o "$TEMP_ZIP"; then
+        print_error "Failed to download the latest release zip file."
+    fi
+
+    TMP_DIR=$(mktemp -d)
+    unzip "$TEMP_ZIP" -d "$TMP_DIR"
+    rm "$TEMP_ZIP"
+
+    EXTRACTED_DIR=$(find "$TMP_DIR" -mindepth 1 -maxdepth 1 -type d)
+    if [ ! -d "$EXTRACTED_DIR" ]; then
+        print_error "Could not find the extracted folder."
+    fi
+
+    SOURCE_SUBDIR="$EXTRACTED_DIR/AutodartsTouch"
+    if [ ! -d "$SOURCE_SUBDIR" ]; then
+        print_error "The 'AutodartsTouch' subdirectory was not found in the extracted files."
+    fi
+
+    print_info "Moving application files to $APP_DIR..."
+    mv "$SOURCE_SUBDIR" "$APP_DIR"
+    rm -rf "$TMP_DIR"
 fi
-
-# The application files are in the 'AutodartsTouch' subdirectory.
-SOURCE_SUBDIR="$CLONE_DIR/AutodartsTouch"
-
-# Check if the source subdirectory exists
-if [ ! -d "$SOURCE_SUBDIR" ]; then
-    print_error "The 'AutodartsTouch' subdirectory was not found in the repository."
-fi
-
-# Move the entire application subdirectory to the final destination
-print_info "Moving application files to $APP_DIR..."
-if ! mv "$SOURCE_SUBDIR" "$APP_DIR"; then
-    print_error "Failed to move application files."
-fi
-
-# Clean up the temporary directory
-rm -rf "$TMP_DIR"
 
 # Set ownership and permissions now that all files are in place
 chown -R "$GUI_USER:$GUI_USER" "$APP_DIR"
