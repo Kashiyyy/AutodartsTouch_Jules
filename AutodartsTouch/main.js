@@ -21,7 +21,35 @@ let autodartsToolsExtensionId = null;
 let availableUpdateVersion = null; // To store update info
 
 const GITHUB_REPO = 'creazy231/tools-for-autodarts';
+const APP_GITHUB_REPO = 'Kashiyyy/AutodartsTouch';
 let EXTENSION_DIR; // Will be initialized once the app is ready
+
+// Helper function to get latest app release info
+async function getLatestAppInfo() {
+  try {
+    const response = await axios.get(`https://api.github.com/repos/${APP_GITHUB_REPO}/releases/latest`);
+    // Return the raw tag name, as that's what the install script and git expect.
+    return { version: response.data.tag_name };
+  } catch (error) {
+    console.error('Failed to fetch latest app info:', error);
+    return null;
+  }
+}
+
+// Helper function to get the currently installed app version from version.json
+function getInstalledAppVersion() {
+  const versionPath = path.join(__dirname, 'version.json');
+  if (fs.existsSync(versionPath)) {
+    try {
+      const versionFile = JSON.parse(fs.readFileSync(versionPath, 'utf-8'));
+      return versionFile.version;
+    } catch (error) {
+      console.error('Failed to read or parse app version file:', error);
+      return null;
+    }
+  }
+  return null;
+}
 
 // Helper function to get latest release info (version and download URL)
 async function getLatestExtensionInfo() {
@@ -433,6 +461,77 @@ app.whenReady().then(async () => {
   EXTENSION_DIR = path.join(__dirname, 'extensions', extensionName);
 
   // Register IPC Handlers that depend on app paths
+  ipcMain.handle('getAppVersions', async () => {
+    try {
+      const installed = getInstalledAppVersion();
+      const latestInfo = await getLatestAppInfo();
+      if (!latestInfo) return { error: 'Could not fetch latest version info from GitHub.', installed };
+      const latest = latestInfo.version;
+
+      let isUpdateAvailable = false;
+      // If the latest version is valid and the installed version is not,
+      // consider an update available (e.g., from 'main' to a release).
+      if (semver.valid(latest)) {
+        if (!semver.valid(installed)) {
+          isUpdateAvailable = true;
+        } else {
+          // Both are valid, so compare them.
+          isUpdateAvailable = semver.gt(latest, installed);
+        }
+      }
+
+      return { installed, latest, isUpdateAvailable };
+    } catch (error) {
+      // Return a generic error but still provide the installed version if possible
+      console.error('IPC: getAppVersions error:', error);
+      const installed = getInstalledAppVersion();
+      return { error: error.message, installed };
+    }
+  });
+
+  function runUpdateScript(version) {
+    // This script is now part of the application bundle.
+    const scriptPath = path.join(__dirname, 'update.sh');
+
+    // Ensure the script is executable, as permissions might be lost.
+    try {
+      fs.chmodSync(scriptPath, '755');
+    } catch (error) {
+      console.error(`Failed to set permissions on update script: ${error}`);
+      settingsView.webContents.send('update-failed', 'Failed to set permissions on update script.');
+      return;
+    }
+
+    // Execute the local update script, passing the target version as an argument.
+    exec(`bash "${scriptPath}" "${version || ''}"`, (error, stdout, stderr) => {
+      if (error) {
+        console.error(`Update script execution failed: ${error}`);
+        settingsView.webContents.send('update-failed', stderr);
+        return;
+      }
+      // On success, notify the settings window.
+      settingsView.webContents.send('update-successful');
+    });
+  }
+
+  ipcMain.on('updateApp', (event, version) => {
+    runUpdateScript(version);
+  });
+
+  ipcMain.on('reinstallApp', (event, version) => {
+    runUpdateScript(version);
+  });
+
+  ipcMain.on('reboot-system', () => {
+    exec('reboot', (err) => {
+      if (err) {
+        console.error('Reboot command failed:', err);
+        // Inform the user if the command fails
+        settingsView.webContents.send('reboot-failed', 'Reboot command failed. Please reboot manually.');
+      }
+    });
+  });
+
   ipcMain.handle('getExtensionVersions', async () => {
     try {
       const installed = getInstalledExtensionVersion();

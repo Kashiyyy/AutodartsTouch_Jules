@@ -31,6 +31,12 @@ contextBridge.exposeInMainWorld('api', {
 
 // API for settings and other webviews
 contextBridge.exposeInMainWorld('electronAPI', {
+  on: (channel, callback) => {
+    const validChannels = ['update-successful', 'update-failed', 'reboot-failed'];
+    if (validChannels.includes(channel)) {
+      ipcRenderer.on(channel, (event, ...args) => callback(...args));
+    }
+  },
   inputFocused: (viewName) => ipcRenderer.send('input-focused', viewName),
   inputBlurred: (viewName) => ipcRenderer.send('input-blurred', viewName),
   getKeyboardLayouts: () => ipcRenderer.invoke('get-keyboard-layouts'),
@@ -40,6 +46,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   closeSettings: () => ipcRenderer.send('close-settings'),
   updateKeyboardStyleLive: (style) => ipcRenderer.send('update-keyboard-style-live', style),
   updateToolbarStyleLive: (style) => ipcRenderer.send('update-toolbar-style-live', style),
+
+  // App Update Management
+  getAppVersions: () => ipcRenderer.invoke('getAppVersions'),
+  updateApp: (version) => ipcRenderer.send('updateApp', version),
+  reinstallApp: (version) => ipcRenderer.send('reinstallApp', version),
+  rebootSystem: () => ipcRenderer.send('reboot-system'),
 
   // Extension Management API
   getExtensionVersions: () => ipcRenderer.invoke('getExtensionVersions'),
