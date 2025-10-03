@@ -216,10 +216,15 @@ fi
 
 # --- Step 5: Download Autodarts Touch Application
 print_header "Step 5: Downloading Autodarts Touch Files"
+
+# Change to a safe directory before deleting the application directory to avoid CWD errors.
+print_info "Changing to temporary directory..."
+cd /tmp
+
 # Clean up old directory
 rm -rf "$APP_DIR"
 
-print_info "Cloning repository to a temporary directory..."
+print_info "Cloning repository to a new temporary directory..."
 TMP_DIR=$(mktemp -d)
 # The repo name is derived from the URL, e.g., "AutodartsTouch_Jules"
 REPO_NAME=$(basename "$GITHUB_REPO_URL" .git)

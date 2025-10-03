@@ -1,6 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
+# Change to a safe directory immediately to prevent CWD-related errors.
+cd /tmp || exit 1
+
 # This script is responsible for fetching the latest installer and running it.
 # It is designed to be a stable entry point for the update process,
 # ensuring that the application can reliably trigger its own update.
