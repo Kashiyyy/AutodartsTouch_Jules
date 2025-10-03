@@ -557,7 +557,7 @@ app.whenReady().then(async () => {
           }
         }
         if (toolbarView && toolbarView.webContents && !toolbarView.webContents.isDestroyed()) {
-          toolbarView.webContents.send('update-installed');
+          toolbarView.webContents.send('update-installed', { type: 'extension' });
         }
       }
       return { success };
@@ -826,24 +826,37 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', () => app.quit());
 
 async function checkForUpdatesAndNotifyToolbar() {
-  const isExtensionEnabled = store.get('enableExtension', false);
-
-  if (!isExtensionEnabled) {
-    return;
-  }
-
-  try {
-    const installedVersion = getInstalledExtensionVersion();
-    const latestInfo = await getLatestExtensionInfo();
-
-    if (installedVersion && latestInfo && latestInfo.version) {
-      if (semver.gt(latestInfo.version, installedVersion)) {
-        if (toolbarView && toolbarView.webContents && !toolbarView.webContents.isDestroyed()) {
-          toolbarView.webContents.send('update-available', 'Tools for Autodarts has a new update.');
+    // Check for main application updates
+    try {
+        const installed = getInstalledAppVersion();
+        const latestInfo = await getLatestAppInfo();
+        if (latestInfo && latestInfo.version && installed) {
+            if (installed !== latestInfo.version) {
+                if (toolbarView && toolbarView.webContents && !toolbarView.webContents.isDestroyed()) {
+                    toolbarView.webContents.send('update-available', { type: 'app', message: 'AutodartsTouch has a new update.' });
+                }
+            }
         }
-      }
+    } catch (error) {
+        console.error('An error occurred during the startup app update check:', error);
     }
-  } catch (error) {
-    console.error('An error occurred during the startup update check:', error);
-  }
+
+    // Check for extension updates
+    const isExtensionEnabled = store.get('enableExtension', false);
+    if (isExtensionEnabled) {
+        try {
+            const installedVersion = getInstalledExtensionVersion();
+            const latestInfo = await getLatestExtensionInfo();
+
+            if (installedVersion && latestInfo && latestInfo.version) {
+                if (semver.gt(latestInfo.version, installedVersion)) {
+                    if (toolbarView && toolbarView.webContents && !toolbarView.webContents.isDestroyed()) {
+                        toolbarView.webContents.send('update-available', { type: 'extension', message: 'Tools for Autodarts has a new update.' });
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('An error occurred during the startup extension update check:', error);
+        }
+    }
 }
