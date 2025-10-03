@@ -2,7 +2,7 @@ const { app, BrowserWindow, BrowserView, ipcMain, screen, session, shell, dialog
 const path = require('path');
 const fs = require('fs');
 const Store = require('electron-store');
-const { exec } = require('child_process');
+const { exec, spawn } = require('child_process');
 const axios = require('axios');
 const unzipper = require('unzipper');
 const semver = require('semver');
@@ -518,20 +518,20 @@ app.whenReady().then(async () => {
   ipcMain.on('restartApp', () => {
     const scriptPath = path.join(__dirname, 'AutodartsTouch.sh');
 
-    // Make sure the script is executable
     try {
       fs.chmodSync(scriptPath, '755');
     } catch (error) {
       console.error(`Failed to set permissions on restart script: ${error}`);
-      // Optionally, send an error back to the renderer process
       return;
     }
 
-    // Spawn the script as a detached process
-    const child = exec(`bash "${scriptPath}"`, { detached: true, stdio: 'ignore' });
+    console.log(`Relaunching with script: ${scriptPath}`);
+    const child = spawn('bash', [scriptPath], {
+      detached: true,
+      stdio: 'inherit'
+    });
     child.unref();
 
-    // Quit the current application
     app.quit();
   });
 
