@@ -594,7 +594,8 @@
             });
           }
 
-          setExtensionRowVisibility(settings.enableExtension);
+          // Always show the extension status, regardless of the toggle state.
+          updateExtensionStatus();
         }
       }
     }
@@ -645,22 +646,9 @@
 
     keyboardLayoutSelect.addEventListener('change', sendLiveUpdate);
 
-    function setExtensionRowVisibility(visible) {
-      const status = tfaExtensionRow.querySelector('.extension-status');
-      const actions = tfaExtensionRow.querySelector('.extension-actions');
-      if (visible) {
-        status.style.visibility = 'visible';
-        actions.style.visibility = 'visible';
-        updateExtensionStatus();
-      } else {
-        status.style.visibility = 'hidden';
-        actions.style.visibility = 'hidden';
-      }
-    }
-
-    enableExtensionCheckbox.addEventListener('change', () => {
-      setExtensionRowVisibility(enableExtensionCheckbox.checked);
-    });
+    // The change event for the checkbox is now implicitly handled
+    // when the settings are saved. No immediate UI change is needed,
+    // so the specific event listener has been removed.
 
     async function handleExtensionAction(actionFn, button, workingText) {
       if (!window.electronAPI || !actionFn) return;
@@ -745,8 +733,9 @@
       tabNameInputs.forEach((input, index) => input.value = defaultTabs[index].name);
       tabUrlInputs.forEach((input, index) => input.value = defaultTabs[index].url);
 
-      // Hide extension section immediately
-      setExtensionRowVisibility(false);
+      // The extension row is always visible now, so no need to hide it on reset.
+      // We just set the checkbox to its default state.
+      enableExtensionCheckbox.checked = false;
 
       // Construct settings object from these default values
       const settings = {
