@@ -1,16 +1,17 @@
 # AutodartsTouch
 
-AutodartsTouch is a kiosk application optimized for touchscreens, primarily designed for use with [Autodarts](https://autodarts.io/) on a Raspberry Pi. It provides a user-friendly interface for controlling web content, an integrated on-screen keyboard, and various customization options.
+AutodartsTouch is a kiosk application optimized for touchscreens, primarily designed for use with [Autodarts](https://autodarts.io/) on a Raspberry Pi. It transforms a Raspberry Pi with a touchscreen into a full-featured darts display, providing a user-friendly interface for controlling web content, an integrated on-screen keyboard, and various customization options.
 
-## What is AutodartsTouch?
+## Tested Platforms
 
-AutodartsTouch transforms a Raspberry Pi with a touchscreen into a full-featured darts display. The application starts in full-screen mode (kiosk mode) and, by default, displays the Autodarts website. Thanks to the customizable tab function, any other websites, such as a local service page, can also be integrated.
-
-The integrated toolbar allows for easy switching between tabs, reloading the current page, and accessing settings. An on-screen keyboard automatically appears when an input field is tapped, allowing operation without a physical keyboard.
+This application has been successfully tested on the following platforms:
+-   **Raspberry Pi 5** with Raspberry Pi OS (64-bit)
+-   **Linux Mint** (Virtual Machine)
+-   **Ubuntu** (Virtual Machine)
 
 ## Installation
 
-The installation has been made as simple as possible. Just run the following command in your Raspberry Pi terminal:
+The installation is designed to be as simple as possible. Just run the following command in your terminal:
 
 ```bash
 bash <(curl -sL https://raw.githubusercontent.com/Kashiyyy/AutodartsTouch/main/AutodartsTouchInstall.sh)
