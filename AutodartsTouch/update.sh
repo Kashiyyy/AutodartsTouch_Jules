@@ -41,17 +41,29 @@ if ! command -v zenity &> /dev/null; then
     exit 1
 fi
 
-# Use zenity to graphically prompt the user for their password.
-# This is necessary because the script is run from a non-terminal GUI application.
-PASSWORD=$(zenity --password --title="Authentication Required" --text="Please enter your password to run the update." 2>/dev/null)
+# Use a loop to repeatedly ask for the password until it's correct.
+while true; do
+    # Use zenity to graphically prompt the user for their password.
+    PASSWORD=$(zenity --password --title="Authentication Required" --text="Please enter your password to run the update." 2>/dev/null)
 
-# Exit if the user cancelled the dialog (zenity returns exit code 1).
-if [ $? -ne 0 ]; then
-    echo "Update cancelled by user."
-    exit 1
-fi
+    # Exit if the user cancelled the dialog (zenity returns exit code 1).
+    if [ $? -ne 0 ]; then
+        echo "Update cancelled by user."
+        exit 1
+    fi
 
-# Run the installer with sudo.
+    # Try to validate the password with a non-destructive command.
+    # The output is redirected to /dev/null to keep the terminal clean.
+    if echo "$PASSWORD" | sudo -S -p '' true >/dev/null 2>&1; then
+        # Password is correct, so break the loop.
+        break
+    else
+        # Password was incorrect. Show an error dialog and loop again.
+        zenity --error --text="Incorrect password. Please try again." --title="Authentication Failed" 2>/dev/null
+    fi
+done
+
+# Now that the password has been validated, run the installer with sudo.
 # The -S flag tells sudo to read the password from standard input.
 # The -p '' flag prevents sudo from issuing its own prompt on the command line.
 if [ -n "$VERSION_TO_INSTALL" ]; then
