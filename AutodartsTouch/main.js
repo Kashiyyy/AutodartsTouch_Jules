@@ -1,9 +1,9 @@
 const { app, BrowserWindow, BrowserView, ipcMain, screen, session, shell, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const https = require('https');
 const Store = require('electron-store');
 const { exec, spawn } = require('child_process');
-const axios = require('axios');
 const unzipper = require('unzipper');
 const semver = require('semver');
 
@@ -24,12 +24,52 @@ const GITHUB_REPO = 'creazy231/tools-for-autodarts';
 const APP_GITHUB_REPO = 'Kashiyyy/AutodartsTouch';
 let EXTENSION_DIR; // Will be initialized once the app is ready
 
+// Generic helper for GET requests to GitHub API
+function getJson(url) {
+  return new Promise((resolve, reject) => {
+    const options = {
+      headers: {
+        'User-Agent': 'AutodartsTouch-App',
+        'Accept': 'application/vnd.github.v3+json'
+      }
+    };
+
+    https.get(url, options, (res) => {
+      // Handle redirects
+      if (res.statusCode === 301 || res.statusCode === 302) {
+        if (res.headers.location) {
+          return getJson(res.headers.location).then(resolve).catch(reject);
+        } else {
+          return reject(new Error(`Redirected but no location header found.`));
+        }
+      }
+
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        return reject(new Error(`GitHub API request failed with status code: ${res.statusCode}`));
+      }
+
+      let data = '';
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+      res.on('end', () => {
+        try {
+          resolve(JSON.parse(data));
+        } catch (e) {
+          reject(e);
+        }
+      });
+    }).on('error', (e) => {
+      reject(e);
+    });
+  });
+}
+
 // Helper function to get latest app release info
 async function getLatestAppInfo() {
   try {
-    const response = await axios.get(`https://api.github.com/repos/${APP_GITHUB_REPO}/releases/latest`);
-    // Return the raw tag name, as that's what the install script and git expect.
-    return { version: response.data.tag_name };
+    const data = await getJson(`https://api.github.com/repos/${APP_GITHUB_REPO}/releases/latest`);
+    return { version: data.tag_name };
   } catch (error) {
     console.error('Failed to fetch latest app info:', error);
     return null;
@@ -54,9 +94,9 @@ function getInstalledAppVersion() {
 // Helper function to get latest release info (version and download URL)
 async function getLatestExtensionInfo() {
   try {
-    const response = await axios.get(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`);
-    const latestVersion = semver.clean(response.data.tag_name);
-    const chromeAsset = response.data.assets.find(asset => asset.name.endsWith('-chrome.zip'));
+    const data = await getJson(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`);
+    const latestVersion = semver.clean(data.tag_name);
+    const chromeAsset = data.assets.find(asset => asset.name.endsWith('-chrome.zip'));
 
     if (!chromeAsset) {
       console.error('Could not find Chrome asset in the latest release.');
@@ -90,39 +130,49 @@ function getInstalledExtensionVersion() {
 }
 
 // Helper function to download and extract the extension
-async function downloadAndInstallExtension(url, version) {
-  try {
+function downloadAndInstallExtension(url) {
+  return new Promise((resolve, reject) => {
     if (fs.existsSync(EXTENSION_DIR)) {
       fs.rmSync(EXTENSION_DIR, { recursive: true, force: true });
     }
     fs.mkdirSync(EXTENSION_DIR, { recursive: true });
 
-    const response = await axios({
-      url,
-      method: 'GET',
-      responseType: 'stream'
-    });
+    const options = {
+      headers: { 'User-Agent': 'AutodartsTouch-App' }
+    };
 
-    const extraction = response.data.pipe(unzipper.Extract({ path: EXTENSION_DIR }));
+    https.get(url, options, (res) => {
+      // Handle redirects for file downloads
+      if (res.statusCode === 301 || res.statusCode === 302) {
+        if (res.headers.location) {
+          // Recursively call with the new URL
+          return downloadAndInstallExtension(res.headers.location).then(resolve).catch(reject);
+        } else {
+          return reject(new Error('Redirected but no location header found for download.'));
+        }
+      }
 
-    await new Promise((resolve, reject) => {
-      extraction.on('finish', () => {
-        resolve();
-      });
+      if (res.statusCode !== 200) {
+        return reject(new Error(`Failed to download extension with status code: ${res.statusCode}`));
+      }
+
+      const extraction = res.pipe(unzipper.Extract({ path: EXTENSION_DIR }));
+      extraction.on('finish', () => resolve(true));
       extraction.on('error', (err) => {
         console.error('An error occurred during extraction:', err);
+        if (fs.existsSync(EXTENSION_DIR)) {
+          fs.rmSync(EXTENSION_DIR, { recursive: true, force: true });
+        }
         reject(err);
       });
+    }).on('error', (err) => {
+      console.error(`Failed to download extension: ${err}`);
+      if (fs.existsSync(EXTENSION_DIR)) {
+        fs.rmSync(EXTENSION_DIR, { recursive: true, force: true });
+      }
+      reject(err);
     });
-
-    return true;
-  } catch (error) {
-    console.error(`Failed to download or extract extension: ${error}`);
-    if (fs.existsSync(EXTENSION_DIR)) {
-      fs.rmSync(EXTENSION_DIR, { recursive: true, force: true });
-    }
-    return false;
-  }
+  });
 }
 
 let toolbarHeight;
@@ -557,30 +607,32 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.handle('downloadExtension', async () => {
-    const latestInfo = await getLatestExtensionInfo();
-    if (latestInfo && latestInfo.url && latestInfo.version) {
-      const success = await downloadAndInstallExtension(latestInfo.url, latestInfo.version);
-      if (success) {
-        if (autodartsToolsExtensionId) {
-          await session.defaultSession.removeExtension(autodartsToolsExtensionId);
-          autodartsToolsExtensionId = null;
-        }
-        if (store.get('enableExtension', false)) {
-          try {
-            const extension = await session.defaultSession.loadExtension(EXTENSION_DIR, { allowFileAccess: true });
-            autodartsToolsExtensionId = extension.id;
-          } catch (error) {
-            console.error('Failed to reload extension after download/update:', error);
-          }
-        }
-        if (toolbarView && toolbarView.webContents && !toolbarView.webContents.isDestroyed()) {
-          toolbarView.webContents.send('update-installed', { type: 'extension' });
-        }
+    try {
+      const latestInfo = await getLatestExtensionInfo();
+      if (!latestInfo || !latestInfo.url) {
+        console.error('IPC: downloadExtension failed because latest info was not available.');
+        return { success: false, error: 'Could not get latest release information.' };
       }
-      return { success };
+
+      await downloadAndInstallExtension(latestInfo.url);
+
+      if (autodartsToolsExtensionId) {
+        await session.defaultSession.removeExtension(autodartsToolsExtensionId);
+        autodartsToolsExtensionId = null;
+      }
+      if (store.get('enableExtension', false)) {
+        const extension = await session.defaultSession.loadExtension(EXTENSION_DIR, { allowFileAccess: true });
+        autodartsToolsExtensionId = extension.id;
+      }
+      if (toolbarView && toolbarView.webContents && !toolbarView.webContents.isDestroyed()) {
+        toolbarView.webContents.send('update-installed', { type: 'extension' });
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('IPC: downloadExtension process failed:', error);
+      return { success: false, error: error.message || 'An unknown error occurred during download.' };
     }
-    console.error('IPC: downloadExtension failed because latest info was not available.');
-    return { success: false, error: 'Could not get latest release information.' };
   });
 
   // Other IPC Handlers not dependent on app paths

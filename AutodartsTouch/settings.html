@@ -489,7 +489,7 @@
         reinstallAppBtn.style.display = 'none';
 
         const restartBtn = document.createElement('button');
-        restartBtn.textContent = 'Restart App';
+        restartBtn.textContent = 'Restart';
         restartBtn.style.backgroundColor = '#5cb85c';
         restartBtn.style.display = 'inline-block';
 
@@ -501,7 +501,10 @@
         restartBtn.addEventListener('click', () => {
           restartBtn.textContent = 'Restarting...';
           restartBtn.disabled = true;
-          if (window.electronAPI) window.electronAPI.restartApp();
+          // Use the correct API object, as seen in power-menu.html
+          if (window.api && window.api.powerControl) {
+            window.api.powerControl('restart');
+          }
         });
       });
 
