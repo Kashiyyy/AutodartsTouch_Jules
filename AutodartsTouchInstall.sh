@@ -173,15 +173,15 @@ print_header "Step 2: Installing System Dependencies"
 declare -a packages
 case "$PACKAGE_MANAGER" in
   apt)
-    packages=("curl" "git" "unzip" "build-essential" "alsa-utils" "policykit-1")
+    packages=("curl" "git" "unzip" "build-essential" "alsa-utils" "zenity")
     ;;
   dnf|yum)
     # For Fedora/CentOS, 'Development Tools' group is equivalent to build-essential
-    packages=("curl" "git" "unzip" "@development-tools" "alsa-utils" "polkit")
+    packages=("curl" "git" "unzip" "@development-tools" "alsa-utils" "zenity")
     ;;
   pacman)
     # For Arch, base-devel group is equivalent to build-essential
-    packages=("curl" "git" "unzip" "base-devel" "alsa-utils" "polkit")
+    packages=("curl" "git" "unzip" "base-devel" "alsa-utils" "zenity")
     ;;
   *)
     print_error "Package name translation not configured for $PACKAGE_MANAGER."
@@ -354,22 +354,8 @@ print_header "Step 8: Applying System Configurations"
 # Hardware-specific configurations for Raspberry Pi (rotation, Argon case) have been removed.
 # The user can configure these manually if needed.
 
-# --- Step 9: Install Polkit Policy
-print_header "Step 9: Installing Polkit Policy"
-POLICY_SOURCE="$APP_DIR/com.autodartstouch.install.policy"
-POLICY_DEST="/usr/share/polkit-1/actions/com.autodartstouch.install.policy"
-
-if [ -f "$POLICY_SOURCE" ]; then
-  print_info "Installing Polkit policy file to $POLICY_DEST..."
-  cp "$POLICY_SOURCE" "$POLICY_DEST"
-  chmod 644 "$POLICY_DEST"
-  print_success "Polkit policy installed successfully."
-else
-  print_warning "Polkit policy file not found at $POLICY_SOURCE. Skipping installation."
-fi
-
-# --- Step 10: Configure Autostart
-print_header "Step 10: Setting up Autostart"
+# --- Step 9: Configure Autostart
+print_header "Step 9: Setting up Autostart"
 print_info "Configuring the application to start automatically on boot."
 mkdir -p "$AUTOSTART_DESKTOP_DIR"
 cat > "$DESKTOP_FILE" <<DESK
@@ -385,8 +371,8 @@ chown "$GUI_USER:$GUI_USER" "$DESKTOP_FILE"
 chmod 644 "$DESKTOP_FILE"
 print_success "Autostart has been configured."
 
-# --- Step 11: Finalizing Setup
-print_header "Step 11: Finalizing Permissions"
+# --- Step 10: Finalizing Setup
+print_header "Step 10: Finalizing Permissions"
 chown -R "$GUI_USER:$GUI_USER" "$APP_DIR"
 chmod -R u+rwX,go+rX,go-w "$APP_DIR"
 print_success "File permissions have been set."

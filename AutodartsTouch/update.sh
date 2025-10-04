@@ -32,23 +32,44 @@ fi
 # Make the downloaded script executable
 chmod +x "$TEMP_INSTALLER"
 
-# Run the installer script using pkexec, which provides a native graphical prompt.
+# Run the installer script, using Zenity to ask for the sudo password.
 echo "Executing the installer..."
 
-# Check if pkexec is available.
-if ! command -v pkexec &> /dev/null; then
-    echo "ERROR: 'pkexec' is not installed. The graphical password prompt cannot be displayed."
-    # Optionally, you could fall back to another method here, but for now, we'll exit.
+# Check if zenity is available, which is needed for the graphical password prompt.
+if ! command -v zenity &> /dev/null; then
+    echo "ERROR: 'zenity' is not installed. The graphical password prompt cannot be displayed."
     exit 1
 fi
 
-# Use pkexec to run the installer script.
-# Polkit will handle the authentication prompt based on the policy file we installed.
-# If the user cancels or fails authentication, pkexec will exit with a non-zero status.
+# Use a loop to repeatedly ask for the password until it's correct.
+while true; do
+    # Use zenity to graphically prompt the user for their password.
+    PASSWORD=$(zenity --password --title="Authentication Required" --text="Please enter your password to run the update." 2>/dev/null)
+
+    # Exit if the user cancelled the dialog (zenity returns exit code 1).
+    if [ $? -ne 0 ]; then
+        echo "Update cancelled by user."
+        exit 1
+    fi
+
+    # Try to validate the password with a non-destructive command.
+    # The output is redirected to /dev/null to keep the terminal clean.
+    if echo "$PASSWORD" | sudo -S -p '' true >/dev/null 2>&1; then
+        # Password is correct, so break the loop.
+        break
+    else
+        # Password was incorrect. Show an error dialog and loop again.
+        zenity --error --text="Incorrect password. Please try again." --title="Authentication Failed" 2>/dev/null
+    fi
+done
+
+# Now that the password has been validated, run the installer with sudo.
+# The -S flag tells sudo to read the password from standard input.
+# The -p '' flag prevents sudo from issuing its own prompt on the command line.
 if [ -n "$VERSION_TO_INSTALL" ]; then
-    pkexec bash "$TEMP_INSTALLER" "$VERSION_TO_INSTALL"
+    echo "$PASSWORD" | sudo -S -p '' bash "$TEMP_INSTALLER" "$VERSION_TO_INSTALL"
 else
-    pkexec bash "$TEMP_INSTALLER"
+    echo "$PASSWORD" | sudo -S -p '' bash "$TEMP_INSTALLER"
 fi
 
 echo "--- Update process initiated. The application will restart upon completion. ---"
