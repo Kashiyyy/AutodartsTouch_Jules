@@ -516,9 +516,9 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.on('restartApp', () => {
-    console.log('Initiating application restart via app.relaunch().');
+    console.log('Initiating application restart via app.relaunch() and app.exit().');
     app.relaunch();
-    app.quit();
+    app.exit();
   });
 
   ipcMain.handle('getExtensionVersions', async () => {
@@ -621,7 +621,7 @@ app.whenReady().then(async () => {
     switch (action) {
       case 'shutdown': exec('shutdown -h now', (err) => { if (err) console.error('Shutdown command failed:', err); }); break;
       case 'restart': exec('reboot', (err) => { if (err) console.error('Restart command failed:', err); }); break;
-      case 'close-app': app.quit(); break;
+      case 'close-app': app.exit(); break;
     }
   });
 
