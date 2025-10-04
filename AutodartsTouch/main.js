@@ -516,26 +516,8 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.on('restartApp', () => {
-    const scriptPath = path.join(__dirname, 'AutodartsTouch.sh');
-
-    console.log('Initiating application restart...');
-
-    // Spawn a detached process that will wait and then re-launch the main script.
-    // This ensures the current application can quit immediately.
-    const child = spawn('bash', [
-        '-c',
-        // Wait 2 seconds for the app to close, then execute the main startup script.
-        // 'exec' replaces the shell process with the application process.
-        `sleep 2 && exec "${scriptPath}"`
-    ], {
-        detached: true,
-        stdio: 'ignore'
-    });
-
-    // Unreference the child, so the parent can exit independently.
-    child.unref();
-
-    // Quit the current application instance.
+    console.log('Initiating application restart via app.relaunch().');
+    app.relaunch();
     app.quit();
   });
 
