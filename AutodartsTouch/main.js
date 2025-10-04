@@ -24,18 +24,26 @@ const GITHUB_REPO = 'creazy231/tools-for-autodarts';
 const APP_GITHUB_REPO = 'Kashiyyy/AutodartsTouch';
 let EXTENSION_DIR; // Will be initialized once the app is ready
 
+const apiCache = new Map();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
 // Generic helper for GET requests to GitHub API
 function getJson(url) {
-  return new Promise((resolve, reject) => {
+  const cached = apiCache.get(url);
+  if (cached && (Date.now() - cached.timestamp < CACHE_DURATION)) {
+    return cached.promise;
+  }
+
+  const promise = new Promise((resolve, reject) => {
     const options = {
       headers: {
         'User-Agent': 'AutodartsTouch-App',
-        'Accept': 'application/vnd.github.v3+json'
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28'
       }
     };
 
     https.get(url, options, (res) => {
-      // Handle redirects
       if (res.statusCode === 301 || res.statusCode === 302) {
         if (res.headers.location) {
           return getJson(res.headers.location).then(resolve).catch(reject);
@@ -45,6 +53,7 @@ function getJson(url) {
       }
 
       if (res.statusCode < 200 || res.statusCode >= 300) {
+        apiCache.delete(url); // Evict from cache on failure
         return reject(new Error(`GitHub API request failed with status code: ${res.statusCode}`));
       }
 
@@ -56,13 +65,27 @@ function getJson(url) {
         try {
           resolve(JSON.parse(data));
         } catch (e) {
+          apiCache.delete(url); // Evict from cache on failure
           reject(e);
         }
       });
     }).on('error', (e) => {
+      apiCache.delete(url); // Evict from cache on failure
       reject(e);
     });
   });
+
+  apiCache.set(url, { promise, timestamp: Date.now() });
+
+  // Optional: Clean up cache entry after duration to prevent memory leaks with changing URLs
+  setTimeout(() => {
+    if (apiCache.get(url) === promise) {
+       apiCache.delete(url);
+    }
+  }, CACHE_DURATION);
+
+
+  return promise;
 }
 
 // Helper function to get latest app release info
