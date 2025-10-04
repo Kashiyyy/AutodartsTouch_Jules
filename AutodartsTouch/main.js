@@ -631,6 +631,28 @@ app.whenReady().then(async () => {
     }
   });
 
+  ipcMain.handle('uninstallExtension', async () => {
+    try {
+      // First, unload the extension if it's currently active
+      if (autodartsToolsExtensionId) {
+        await session.defaultSession.removeExtension(autodartsToolsExtensionId);
+        autodartsToolsExtensionId = null;
+      }
+      // Then, delete the directory
+      if (fs.existsSync(EXTENSION_DIR)) {
+        fs.rmSync(EXTENSION_DIR, { recursive: true, force: true });
+      }
+      // Notify toolbar to remove any pending notifications
+      if (toolbarView && toolbarView.webContents && !toolbarView.webContents.isDestroyed()) {
+        toolbarView.webContents.send('update-installed', { type: 'extension' });
+      }
+      return { success: true };
+    } catch (error) {
+      console.error('IPC: uninstallExtension process failed:', error);
+      return { success: false, error: error.message || 'An unknown error occurred during uninstallation.' };
+    }
+  });
+
   // Other IPC Handlers not dependent on app paths
   ipcMain.on('open-settings', () => {
     if (currentView !== 'settings') {

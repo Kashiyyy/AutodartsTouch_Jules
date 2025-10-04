@@ -56,6 +56,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Extension Management API
   getExtensionVersions: () => ipcRenderer.invoke('getExtensionVersions'),
   downloadExtension: () => ipcRenderer.invoke('downloadExtension'),
+  uninstallExtension: () => ipcRenderer.invoke('uninstallExtension'),
   openLogFile: () => ipcRenderer.send('open-log-file'),
 });
 
