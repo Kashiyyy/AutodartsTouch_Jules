@@ -216,6 +216,17 @@ fi
 
 # --- Step 5: Download Autodarts Touch Application
 print_header "Step 5: Downloading Autodarts Touch Files"
+
+# --- Backup existing extension directory if it exists
+EXTENSION_DIR="$APP_DIR/extension"
+BACKUP_DIR="/tmp/AutodartsTouch_Extension_Backup"
+if [ -d "$EXTENSION_DIR" ]; then
+    print_info "Backing up existing extension directory..."
+    rm -rf "$BACKUP_DIR" # Remove old backup if it exists
+    mv "$EXTENSION_DIR" "$BACKUP_DIR"
+    print_success "Extension directory backed up to $BACKUP_DIR"
+fi
+
 cd /tmp
 rm -rf "$APP_DIR"
 
@@ -275,6 +286,13 @@ fi
 chown -R "$GUI_USER:$GUI_USER" "$APP_DIR"
 chmod +x "$START_SCRIPT"
 print_success "Application files downloaded successfully to $APP_DIR."
+
+# --- Restore extension directory if a backup exists
+if [ -d "$BACKUP_DIR" ]; then
+    print_info "Restoring extension directory..."
+    mv "$BACKUP_DIR" "$EXTENSION_DIR"
+    print_success "Extension directory restored."
+fi
 
 
 # --- Step 6: Install Node.js Dependencies
