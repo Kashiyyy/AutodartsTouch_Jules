@@ -488,19 +488,19 @@
         updateAppBtn.style.display = 'none';
         reinstallAppBtn.style.display = 'none';
 
-        const rebootBtn = document.createElement('button');
-        rebootBtn.textContent = 'Reboot System';
-        rebootBtn.style.backgroundColor = '#f0ad4e'; // Orange color for caution
-        rebootBtn.style.display = 'inline-block';
+        const restartBtn = document.createElement('button');
+        restartBtn.textContent = 'Restart';
+        restartBtn.style.backgroundColor = '#5cb85c';
+        restartBtn.style.display = 'inline-block';
 
         const actionCol = document.getElementById('app-action-col');
         // Clear any existing buttons (like 'Update' or 'Reinstall')
         actionCol.innerHTML = '';
-        actionCol.appendChild(rebootBtn);
+        actionCol.appendChild(restartBtn);
 
-        rebootBtn.addEventListener('click', () => {
-          rebootBtn.textContent = 'Rebooting...';
-          rebootBtn.disabled = true;
+        restartBtn.addEventListener('click', () => {
+          restartBtn.textContent = 'Restarting...';
+          restartBtn.disabled = true;
           // Use the correct API object, as seen in power-menu.html
           if (window.api && window.api.powerControl) {
             window.api.powerControl('restart');
