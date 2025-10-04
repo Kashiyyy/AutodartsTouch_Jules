@@ -501,9 +501,9 @@
         rebootBtn.addEventListener('click', () => {
           rebootBtn.textContent = 'Rebooting...';
           rebootBtn.disabled = true;
-          // Use the existing 'restart' command from the power menu
-          if (window.electronAPI && window.electronAPI.powerControl) {
-            window.electronAPI.powerControl('restart');
+          // Use the correct API object, as seen in power-menu.html
+          if (window.api && window.api.powerControl) {
+            window.api.powerControl('restart');
           }
         });
       });
