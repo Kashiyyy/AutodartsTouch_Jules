@@ -36,6 +36,29 @@ print_error() {
   exit 1
 }
 
+# Tries to find an existing installation by reading the autostart .desktop file.
+# This ensures that updates are applied to the correct directory.
+discover_app_dir() {
+  local desktop_file="$1"
+  if [ -f "$desktop_file" ]; then
+    print_info "Found existing .desktop file, reading installation path..." >&2
+    # Extract the path from 'Exec=bash /path/to/AutodartsTouch.sh'
+    # sed: find the Exec line, remove the prefix, remove the script suffix, print.
+    # tr: remove potential carriage returns.
+    local exec_path
+    exec_path=$(grep '^Exec=' "$desktop_file" | sed -n 's/^Exec=bash //; s|/AutodartsTouch\.sh$||p' | tr -d '\r')
+
+    if [ -n "$exec_path" ] && [ -d "$exec_path" ]; then
+      # Return the discovered path by printing it
+      echo "$exec_path"
+      return 0
+    fi
+  fi
+  # Return nothing if not found
+  return 1
+}
+
+
 # --- Configuration
 # If a branch name is provided as an argument, use it.
 # Otherwise, fetch the tag name of the latest release from GitHub.
@@ -55,15 +78,26 @@ else
     print_success "Latest release found: $BRANCH_NAME"
   fi
 fi
+
 GITHUB_REPO_URL="https://github.com/Kashiyyy/AutodartsTouch.git"
 
 # --- Environment
 GUI_USER="${SUDO_USER:-$(logname)}"
 HOME_DIR="$(eval echo "~$GUI_USER")"
-APP_DIR="$HOME_DIR/AutodartsTouch"
-START_SCRIPT="$APP_DIR/AutodartsTouch.sh"
+DEFAULT_APP_DIR="$HOME_DIR/AutodartsTouch" # Default for new installs
 AUTOSTART_DESKTOP_DIR="$HOME_DIR/.config/autostart"
 DESKTOP_FILE="$AUTOSTART_DESKTOP_DIR/AutodartsTouch.desktop"
+
+# Discover the application directory. If found, use it. Otherwise, use the default.
+APP_DIR=$(discover_app_dir "$DESKTOP_FILE")
+if [ -z "$APP_DIR" ]; then
+    print_info "No existing installation found. Using default path: $DEFAULT_APP_DIR"
+    APP_DIR="$DEFAULT_APP_DIR"
+else
+    print_success "Found existing installation at: $APP_DIR"
+fi
+
+START_SCRIPT="$APP_DIR/AutodartsTouch.sh"
 VERSION_FILE="$APP_DIR/version.json"
 
 # --- Global variables
@@ -216,6 +250,17 @@ fi
 
 # --- Step 5: Download Autodarts Touch Application
 print_header "Step 5: Downloading Autodarts Touch Files"
+
+# --- Backup existing extension directory if it exists
+EXTENSION_DIR="$APP_DIR/extensions"
+BACKUP_DIR="/tmp/AutodartsTouch_Extension_Backup"
+if [ -d "$EXTENSION_DIR" ]; then
+    print_info "Backing up existing extension directory..."
+    rm -rf "$BACKUP_DIR" # Remove old backup if it exists
+    mv "$EXTENSION_DIR" "$BACKUP_DIR"
+    print_success "Extension directory backed up to $BACKUP_DIR"
+fi
+
 cd /tmp
 rm -rf "$APP_DIR"
 
@@ -275,6 +320,13 @@ fi
 chown -R "$GUI_USER:$GUI_USER" "$APP_DIR"
 chmod +x "$START_SCRIPT"
 print_success "Application files downloaded successfully to $APP_DIR."
+
+# --- Restore extension directory if a backup exists
+if [ -d "$BACKUP_DIR" ]; then
+    print_info "Restoring extension directory..."
+    mv "$BACKUP_DIR" "$EXTENSION_DIR"
+    print_success "Extension directory restored."
+fi
 
 
 # --- Step 6: Install Node.js Dependencies
