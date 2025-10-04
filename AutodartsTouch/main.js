@@ -517,13 +517,14 @@ app.whenReady().then(async () => {
 
   ipcMain.on('restartApp', () => {
     const scriptPath = path.join(__dirname, 'AutodartsTouch.sh');
-    console.log('Initiating non-blocking application restart...');
+    const logPath = path.join(app.getPath('home'), 'autodarts-touch-restart.log');
+    console.log(`Initiating non-blocking application restart. Logging to: ${logPath}`);
 
-    const child = spawn('nohup', [
-        'bash',
-        '-c',
-        `sleep 2 && exec "${scriptPath}"`
-    ], {
+    // Command waits 2s, then executes the main script.
+    // All output (stdout & stderr) is redirected to a persistent log file in the user's home directory.
+    const command = `sleep 2 && exec "${scriptPath}" > "${logPath}" 2>&1`;
+
+    const child = spawn('nohup', ['bash', '-c', command], {
         detached: true,
         stdio: 'ignore'
     });
