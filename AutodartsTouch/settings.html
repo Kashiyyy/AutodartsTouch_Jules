@@ -499,9 +499,12 @@
         actionCol.appendChild(restartBtn);
 
         restartBtn.addEventListener('click', () => {
-          restartBtn.textContent = 'Restarting...';
+          restartBtn.textContent = 'Closing...';
           restartBtn.disabled = true;
-          if (window.electronAPI) window.electronAPI.restartApp();
+          // Use the existing, working 'close-app' functionality which the old process understands.
+          if (window.electronAPI && window.electronAPI.powerControl) {
+            window.electronAPI.powerControl('close-app');
+          }
         });
       });
 
