@@ -488,22 +488,22 @@
         updateAppBtn.style.display = 'none';
         reinstallAppBtn.style.display = 'none';
 
-        const restartBtn = document.createElement('button');
-        restartBtn.textContent = 'Restart App';
-        restartBtn.style.backgroundColor = '#5cb85c';
-        restartBtn.style.display = 'inline-block';
+        const rebootBtn = document.createElement('button');
+        rebootBtn.textContent = 'Reboot System';
+        rebootBtn.style.backgroundColor = '#f0ad4e'; // Orange color for caution
+        rebootBtn.style.display = 'inline-block';
 
         const actionCol = document.getElementById('app-action-col');
         // Clear any existing buttons (like 'Update' or 'Reinstall')
         actionCol.innerHTML = '';
-        actionCol.appendChild(restartBtn);
+        actionCol.appendChild(rebootBtn);
 
-        restartBtn.addEventListener('click', () => {
-          restartBtn.textContent = 'Closing...';
-          restartBtn.disabled = true;
-          // Use the existing, working 'close-app' functionality which the old process understands.
+        rebootBtn.addEventListener('click', () => {
+          rebootBtn.textContent = 'Rebooting...';
+          rebootBtn.disabled = true;
+          // Use the existing 'restart' command from the power menu
           if (window.electronAPI && window.electronAPI.powerControl) {
-            window.electronAPI.powerControl('close-app');
+            window.electronAPI.powerControl('restart');
           }
         });
       });
