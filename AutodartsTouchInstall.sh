@@ -78,6 +78,19 @@ else
     print_success "Latest release found: $BRANCH_NAME"
   fi
 fi
+
+# --- Safeguard against running outdated branches
+# This prevents a user from accidentally running an old update script that lacks critical fixes.
+OUTDATED_BRANCHES=("preserve-extension-on-update" "fix/preserve-extension-on-update-robust")
+for old_branch in "${OUTDATED_BRANCHES[@]}"; do
+  if [ "$BRANCH_NAME" == "$old_branch" ]; then
+    print_error "This installation script is from an outdated branch ('$BRANCH_NAME').
+    To ensure a successful update and prevent data loss, please run the update
+    using the latest branch name: 'fix/preserve-extension-final'
+    Or, for the latest stable release, run the installer with no arguments."
+  fi
+done
+
 GITHUB_REPO_URL="https://github.com/Kashiyyy/AutodartsTouch.git"
 
 # --- Environment
