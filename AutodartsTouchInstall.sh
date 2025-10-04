@@ -252,7 +252,7 @@ fi
 print_header "Step 5: Downloading Autodarts Touch Files"
 
 # --- Backup existing extension directory if it exists
-EXTENSION_DIR="$APP_DIR/extension"
+EXTENSION_DIR="$APP_DIR/extensions"
 BACKUP_DIR="/tmp/AutodartsTouch_Extension_Backup"
 if [ -d "$EXTENSION_DIR" ]; then
     print_info "Backing up existing extension directory..."
