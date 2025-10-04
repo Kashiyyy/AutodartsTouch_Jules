@@ -22,7 +22,7 @@ The script will guide you through the following steps:
 2.  **Node.js**: Installs the required Node.js version for the application.
 3.  **Autodarts**: Runs the official Autodarts installation script.
 4.  **AutodartsTouch**: Downloads the application and installs its dependencies.
-5.  **Configuration**: Optionally set up screen rotation and autostart.
+5.  **Configuration**: Sets up the application to autostart on system boot. (Note: Screen rotation must be configured manually if needed).
 
 After installation, the application will start automatically on every system boot.
 
