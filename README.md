@@ -30,10 +30,12 @@ After installation, the application will start automatically on every system boo
 
 -   **Kiosk Mode**: Starts in full-screen without any window elements for a clean, immersive experience.
 -   **Intelligent On-Screen Keyboard**: A customizable keyboard that automatically appears when you tap an input field and hides when you're done.
+-   **Update Notifications**: Automatically checks for updates to both AutodartsTouch and the "Tools for Autodarts" extension, displaying a scrolling notification in the toolbar when a new version is available.
+-   **Enhanced Touch Experience**: Disables text selection on web pages to prevent accidental highlighting, ensuring smoother navigation on a touchscreen.
 -   **Customizable Toolbar**: A sleek bar at the top of the screen with essential controls:
     -   **Tab Navigation**: Switch between up to five configured websites with a single tap.
-    -   **Power Menu**: Access system controls to shut down, restart, or close the application safely.
-    -   **Refresh Button**: Reload the current page.
+    -   **Dual-Function Refresh**: A short press refreshes the current page, while a long press performs a "force reload," resetting the tab to its original URL.
+    -   **Power Menu**: Access critical system controls to safely **Shutdown**, **Restart**, or **Close** the application.
     -   **Settings Access**: Quickly open the settings panel.
 -   **"Tools for Autodarts" Extension Management**: Seamlessly integrates the popular "Tools for Autodarts" browser extension. The app can automatically check for updates, install, and enable or disable the extension directly from the settings menu.
 -   **Cursor Control**: Easily toggle the visibility of the mouse cursor from the settings, perfect for pure touchscreen operation.
@@ -55,4 +57,4 @@ You can access the settings via the gear icon in the toolbar. Here you can fine-
     -   **Manage Version**: View the installed and latest available versions, and update with a single click.
 -   **Show Cursor**: Toggle the visibility of the mouse cursor.
 
-Changes to tabs or the extension require a quick application restart to take effect, while all other settings are applied instantly.
+Most settings are applied instantly. Changes to tabs, the extension, or certain toolbar styles will trigger a quick and seamless "hot reload" of the interface, avoiding the need for a full application restart.
