@@ -173,15 +173,15 @@ print_header "Step 2: Installing System Dependencies"
 declare -a packages
 case "$PACKAGE_MANAGER" in
   apt)
-    packages=("curl" "git" "unzip" "build-essential" "alsa-utils")
+    packages=("curl" "git" "unzip" "build-essential" "alsa-utils" "zenity")
     ;;
   dnf|yum)
     # For Fedora/CentOS, 'Development Tools' group is equivalent to build-essential
-    packages=("curl" "git" "unzip" "@development-tools" "alsa-utils")
+    packages=("curl" "git" "unzip" "@development-tools" "alsa-utils" "zenity")
     ;;
   pacman)
     # For Arch, base-devel group is equivalent to build-essential
-    packages=("curl" "git" "unzip" "base-devel" "alsa-utils")
+    packages=("curl" "git" "unzip" "base-devel" "alsa-utils" "zenity")
     ;;
   *)
     print_error "Package name translation not configured for $PACKAGE_MANAGER."

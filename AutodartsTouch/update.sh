@@ -32,13 +32,44 @@ fi
 # Make the downloaded script executable
 chmod +x "$TEMP_INSTALLER"
 
-# Run the installer script, passing the version argument if it exists.
-# The main installer will handle fetching the latest release if the argument is empty.
+# Run the installer script, using Zenity to ask for the sudo password.
 echo "Executing the installer..."
+
+# Check if zenity is available, which is needed for the graphical password prompt.
+if ! command -v zenity &> /dev/null; then
+    echo "ERROR: 'zenity' is not installed. The graphical password prompt cannot be displayed."
+    exit 1
+fi
+
+# Use a loop to repeatedly ask for the password until it's correct.
+while true; do
+    # Use zenity to graphically prompt the user for their password.
+    PASSWORD=$(zenity --password --title="Authentication Required" --text="Please enter your password to run the update." 2>/dev/null)
+
+    # Exit if the user cancelled the dialog (zenity returns exit code 1).
+    if [ $? -ne 0 ]; then
+        echo "Update cancelled by user."
+        exit 1
+    fi
+
+    # Try to validate the password with a non-destructive command.
+    # The output is redirected to /dev/null to keep the terminal clean.
+    if echo "$PASSWORD" | sudo -S -p '' true >/dev/null 2>&1; then
+        # Password is correct, so break the loop.
+        break
+    else
+        # Password was incorrect. Show an error dialog and loop again.
+        zenity --error --text="Incorrect password. Please try again." --title="Authentication Failed" 2>/dev/null
+    fi
+done
+
+# Now that the password has been validated, run the installer with sudo.
+# The -S flag tells sudo to read the password from standard input.
+# The -p '' flag prevents sudo from issuing its own prompt on the command line.
 if [ -n "$VERSION_TO_INSTALL" ]; then
-    bash "$TEMP_INSTALLER" "$VERSION_TO_INSTALL"
+    echo "$PASSWORD" | sudo -S -p '' bash "$TEMP_INSTALLER" "$VERSION_TO_INSTALL"
 else
-    bash "$TEMP_INSTALLER"
+    echo "$PASSWORD" | sudo -S -p '' bash "$TEMP_INSTALLER"
 fi
 
 echo "--- Update process initiated. The application will restart upon completion. ---"
