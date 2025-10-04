@@ -516,9 +516,20 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.on('restartApp', () => {
-    console.log('Initiating application restart via app.relaunch() and app.exit().');
-    app.relaunch();
-    app.exit();
+    const scriptPath = path.join(__dirname, 'AutodartsTouch.sh');
+    console.log('Initiating non-blocking application restart...');
+
+    const child = spawn('nohup', [
+        'bash',
+        '-c',
+        `sleep 2 && exec "${scriptPath}"`
+    ], {
+        detached: true,
+        stdio: 'ignore'
+    });
+
+    child.unref();
+    app.quit();
   });
 
   ipcMain.handle('getExtensionVersions', async () => {
@@ -621,7 +632,7 @@ app.whenReady().then(async () => {
     switch (action) {
       case 'shutdown': exec('shutdown -h now', (err) => { if (err) console.error('Shutdown command failed:', err); }); break;
       case 'restart': exec('reboot', (err) => { if (err) console.error('Restart command failed:', err); }); break;
-      case 'close-app': app.exit(); break;
+      case 'close-app': app.quit(); break;
     }
   });
 
