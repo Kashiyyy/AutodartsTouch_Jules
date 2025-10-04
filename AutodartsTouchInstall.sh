@@ -41,7 +41,7 @@ print_error() {
 discover_app_dir() {
   local desktop_file="$1"
   if [ -f "$desktop_file" ]; then
-    print_info "Found existing .desktop file, reading installation path..."
+    print_info "Found existing .desktop file, reading installation path..." >&2
     # Extract the path from 'Exec=bash /path/to/AutodartsTouch.sh'
     # sed: find the Exec line, remove the prefix, remove the script suffix, print.
     # tr: remove potential carriage returns.
