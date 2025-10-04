@@ -481,7 +481,7 @@ function applyToolbarStyle(style) {
 function applyKeyboardStyle(style) {
   const keyboardWidth = style ? style.width : getSetting('keyboard.width', 100);
   const keyHeight = style ? style.keyHeight : getSetting('keyboard.keyHeight', 50);
-  const keyboardLayout = store.get('keyboard.layout', 'de'); // Layout is a string, no need to parse
+  const keyboardLayout = store.get('keyboard.layout', 'qwertz'); // Layout is a string, no need to parse
   if (keyboardView && keyboardView.webContents) {
     const sendStyle = () => keyboardView.webContents.send('update-keyboard-style', { width: keyboardWidth, keyHeight: keyHeight, layout: keyboardLayout });
     if (keyboardView.webContents.isLoading()) keyboardView.webContents.once('dom-ready', sendStyle);
@@ -755,7 +755,7 @@ app.whenReady().then(async () => {
       volume: getSetting('volume', 50),
       keyboardWidth: getSetting('keyboard.width', 100),
       keyHeight: getSetting('keyboard.keyHeight', 50),
-      keyboardLayout: store.get('keyboard.layout', 'de'),
+      keyboardLayout: store.get('keyboard.layout', 'qwertz'),
       toolbarHeight: getSetting('toolbar.height', 72),
       toolbarFontSize: getSetting('toolbar.fontSize', 24),
       enableExtension: store.get('enableExtension', false),
