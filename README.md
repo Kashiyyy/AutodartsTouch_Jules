@@ -1,17 +1,16 @@
 # AutodartsTouch
 
-AutodartsTouch is a kiosk application optimized for touchscreens, primarily designed for use with [Autodarts](https://autodarts.io/) on a Raspberry Pi. It transforms a Raspberry Pi with a touchscreen into a full-featured darts display, providing a user-friendly interface for controlling web content, an integrated on-screen keyboard, and various customization options.
+AutodartsTouch is a kiosk application optimized for touchscreens, primarily designed for use with [Autodarts](https://autodarts.io/) on a Raspberry Pi. It provides a user-friendly interface for controlling web content, an integrated on-screen keyboard, and various customization options.
 
-## Tested Platforms
+## What is AutodartsTouch?
 
-This application has been successfully tested on the following platforms:
--   **Raspberry Pi 5** with Raspberry Pi OS (64-bit)
--   **Linux Mint** (Virtual Machine)
--   **Ubuntu** (Virtual Machine)
+AutodartsTouch transforms a Raspberry Pi with a touchscreen into a full-featured darts display. The application starts in full-screen mode (kiosk mode) and, by default, displays the Autodarts website. Thanks to the customizable tab function, any other websites, such as a local service page, can also be integrated.
+
+The integrated toolbar allows for easy switching between tabs, reloading the current page, and accessing settings. An on-screen keyboard automatically appears when an input field is tapped, allowing operation without a physical keyboard.
 
 ## Installation
 
-The installation is designed to be as simple as possible. Just run the following command in your terminal:
+The installation has been made as simple as possible. Just run the following command in your Raspberry Pi terminal:
 
 ```bash
 bash <(curl -sL https://raw.githubusercontent.com/Kashiyyy/AutodartsTouch/main/AutodartsTouchInstall.sh)
@@ -22,7 +21,7 @@ The script will guide you through the following steps:
 2.  **Node.js**: Installs the required Node.js version for the application.
 3.  **Autodarts**: Runs the official Autodarts installation script.
 4.  **AutodartsTouch**: Downloads the application and installs its dependencies.
-5.  **Configuration**: Sets up the application to autostart on system boot. (Note: Screen rotation must be configured manually if needed).
+5.  **Configuration**: Optionally set up screen rotation and autostart.
 
 After installation, the application will start automatically on every system boot.
 
@@ -30,12 +29,10 @@ After installation, the application will start automatically on every system boo
 
 -   **Kiosk Mode**: Starts in full-screen without any window elements for a clean, immersive experience.
 -   **Intelligent On-Screen Keyboard**: A customizable keyboard that automatically appears when you tap an input field and hides when you're done.
--   **Update Notifications**: Automatically checks for updates to both AutodartsTouch and the "Tools for Autodarts" extension, displaying a scrolling notification in the toolbar when a new version is available.
--   **Enhanced Touch Experience**: Disables text selection on web pages to prevent accidental highlighting, ensuring smoother navigation on a touchscreen.
 -   **Customizable Toolbar**: A sleek bar at the top of the screen with essential controls:
     -   **Tab Navigation**: Switch between up to five configured websites with a single tap.
-    -   **Dual-Function Refresh**: A short press refreshes the current page, while a long press performs a "force reload," resetting the tab to its original URL.
-    -   **Power Menu**: Access critical system controls to safely **Shutdown**, **Restart**, or **Close** the application.
+    -   **Power Menu**: Access system controls to shut down, restart, or close the application safely.
+    -   **Refresh Button**: Reload the current page.
     -   **Settings Access**: Quickly open the settings panel.
 -   **"Tools for Autodarts" Extension Management**: Seamlessly integrates the popular "Tools for Autodarts" browser extension. The app can automatically check for updates, install, and enable or disable the extension directly from the settings menu.
 -   **Cursor Control**: Easily toggle the visibility of the mouse cursor from the settings, perfect for pure touchscreen operation.
@@ -57,4 +54,4 @@ You can access the settings via the gear icon in the toolbar. Here you can fine-
     -   **Manage Version**: View the installed and latest available versions, and update with a single click.
 -   **Show Cursor**: Toggle the visibility of the mouse cursor.
 
-Most settings are applied instantly. Changes to tabs, the extension, or certain toolbar styles will trigger a quick and seamless "hot reload" of the interface, avoiding the need for a full application restart.
+Changes to tabs or the extension require a quick application restart to take effect, while all other settings are applied instantly.
