@@ -559,10 +559,16 @@
 
       if (window.electronAPI.getKeyboardLayouts) {
         const layouts = await window.electronAPI.getKeyboardLayouts();
+        const layoutDisplayNames = {
+          'qwertz': 'QWERTZ',
+          'qwerty': 'QWERTY',
+          'azerty': 'AZERTY'
+        };
+
         layouts.forEach(layout => {
             const option = document.createElement('option');
             option.value = layout;
-            option.textContent = layout.toUpperCase();
+            option.textContent = layoutDisplayNames[layout] || layout.toUpperCase();
             keyboardLayoutSelect.appendChild(option);
         });
       }
@@ -573,7 +579,7 @@
           volumeSlider.value = settings.volume || 50;
           keyboardWidthSlider.value = settings.keyboardWidth || 100;
           keyHeightSlider.value = settings.keyHeight || 50;
-          keyboardLayoutSelect.value = settings.keyboardLayout || 'de';
+          keyboardLayoutSelect.value = settings.keyboardLayout || 'qwertz';
           toolbarHeightSlider.value = settings.toolbarHeight || 72;
           toolbarFontSizeSlider.value = settings.toolbarFontSize || 24;
           enableExtensionCheckbox.checked = settings.enableExtension || false;
@@ -712,7 +718,7 @@
       toolbarFontSizeSlider.value = 24;
       keyboardWidthSlider.value = 100;
       keyHeightSlider.value = 50;
-      keyboardLayoutSelect.value = 'de';
+      keyboardLayoutSelect.value = 'qwertz';
       enableExtensionCheckbox.checked = false;
 
       // Update display values
@@ -742,7 +748,7 @@
         volume: 50,
         keyboardWidth: 100,
         keyHeight: 50,
-        keyboardLayout: 'de',
+        keyboardLayout: 'qwertz',
         toolbarHeight: 72,
         toolbarFontSize: 24,
         tabs: defaultTabs,

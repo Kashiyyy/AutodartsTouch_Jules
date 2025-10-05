@@ -226,7 +226,7 @@
   <script>
     let keyboardElement = document.getElementById('keyboard');
     let currentLayout = 'default';
-    let loadedLayoutName = 'de'; // To track the currently loaded layout file
+    let loadedLayoutName = 'qwertz'; // To track the currently loaded layout file
     let shiftActive = false;
     let popupElement = null;
     let globalClickDisabled = false;
@@ -689,17 +689,17 @@
         await loadLayout(loadedLayoutName.toLowerCase());
         console.log(`[KB_DEBUG] 8. Successfully loaded layout: '${loadedLayoutName}'`);
       } catch (error) {
-        // If it fails, show a notification and try to load the default 'de' layout.
-        console.error(`[KB_DEBUG] Error loading layout '${layoutName}', falling back to 'de'.`, error);
+        // If it fails, show a notification and try to load the default 'qwertz' layout.
+        console.error(`[KB_DEBUG] Error loading layout '${layoutName}', falling back to 'qwertz'.`, error);
         showNotification(`Could not load layout '${layoutName}'. Using default.`);
 
         try {
-          console.log(`[KB_DEBUG] 5a. Attempting to load fallback layout: 'de'`);
-          await loadLayout('de');
-          console.log(`[KB_DEBUG] 8a. Successfully loaded fallback layout: 'de'`);
+          console.log(`[KB_DEBUG] 5a. Attempting to load fallback layout: 'qwertz'`);
+          await loadLayout('qwertz');
+          console.log(`[KB_DEBUG] 8a. Successfully loaded fallback layout: 'qwertz'`);
         } catch (fallbackError) {
           // If the default layout ALSO fails, show a fatal error.
-          console.error("[KB_DEBUG] FATAL: Could not load the default 'de' layout. Keyboard will not function.", fallbackError);
+          console.error("[KB_DEBUG] FATAL: Could not load the default 'qwertz' layout. Keyboard will not function.", fallbackError);
           showNotification("FATAL: Could not load default layout. Keyboard disabled.", true);
           return; // Stop execution.
         }
