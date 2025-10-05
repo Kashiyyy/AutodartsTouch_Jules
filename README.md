@@ -14,7 +14,7 @@ This application has been successfully tested on the following platforms:
 The installation is designed to be as simple as possible. Just run the following command in your terminal:
 
 ```bash
-bash <(curl -sL https://raw.githubusercontent.com/Kashiyyy/AutodartsTouch/main/AutodartsTouchInstall.sh)
+sudo curl -sSL https://raw.githubusercontent.com/Kashiyyy/AutodartsTouch/main/AutodartsTouchInstall.sh | sudo bash
 ```
 
 The script will guide you through the following steps:
