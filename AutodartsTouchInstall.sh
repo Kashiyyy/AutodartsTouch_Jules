@@ -36,6 +36,46 @@ print_error() {
   exit 1
 }
 
+# Detects the OS codename (e.g., bookworm, trixie).
+detect_os_codename() {
+  if [ -f /etc/os-release ]; then
+    # Source the file to get variables like VERSION_CODENAME
+    . /etc/os-release
+    OS_CODENAME="${VERSION_CODENAME:-}"
+    if [ -n "$OS_CODENAME" ]; then
+      print_info "Detected OS codename: $OS_CODENAME" >&2
+      echo "$OS_CODENAME"
+    fi
+  fi
+}
+
+# --- Platform-specific Setup
+# Functions for detecting the environment and setting up platform-specific features.
+
+# On newer Raspberry Pi OS versions (Bookworm and later), screen rotation is
+# handled by a Wayland configuration file. This function displays a helpful
+# message guiding the user on how to do this manually.
+display_wayland_rotation_info() {
+  print_header "Manual Configuration Notice"
+  echo "Your OS version uses Wayland for display management."
+  echo "Screen rotation must be configured manually by editing a system file."
+  echo
+  echo "Instructions:"
+  echo "1. Open the configuration file:"
+  echo "   sudo nano /etc/wayfire.ini"
+  echo
+  echo "2. Find the '[output:DSI-1]' section (your output might be different, e.g., HDMI-A-1)."
+  echo "3. Add one of the following lines under that section:"
+  echo "   transform = 90  # Rotated 90 degrees clockwise"
+  echo "   transform = 180 # Upside down"
+  echo "   transform = 270 # Rotated 270 degrees clockwise"
+  echo "   transform = flipped # Mirrored horizontally"
+  echo
+  echo "4. Save the file and reboot to apply the changes."
+  echo "================================================="
+  echo
+}
+
 # Tries to find an existing installation by reading the autostart .desktop file.
 # This ensures that updates are applied to the correct directory.
 discover_app_dir() {
@@ -161,6 +201,17 @@ install_packages() {
 print_header "Starting Autodarts Touch Setup"
 detect_package_manager
 detect_raspberry_pi
+
+# If on a Raspberry Pi, check the OS version and show Wayland info if needed.
+if [ "$IS_RASPBERRY_PI" = true ]; then
+  OS_CODENAME=$(detect_os_codename)
+  case "$OS_CODENAME" in
+    bookworm|trixie)
+      display_wayland_rotation_info
+      ;;
+  esac
+fi
+
 print_info "Running as user: $GUI_USER"
 print_info "Application will be installed in: $APP_DIR"
 print_info "Installing from branch/tag: $BRANCH_NAME"
