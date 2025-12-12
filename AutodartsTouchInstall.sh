@@ -122,7 +122,29 @@ fi
 GITHUB_REPO_URL="https://github.com/Kashiyyy/AutodartsTouch.git"
 
 # --- Environment
-GUI_USER="${SUDO_USER:-$(logname)}"
+# Determines the correct non-root user, even when run via 'curl | sudo bash'.
+find_gui_user() {
+  # If SUDO_USER is set, we can trust it.
+  if [ -n "${SUDO_USER-}" ]; then
+    echo "$SUDO_USER"
+    return 0
+  fi
+  # As a fallback, find the first user with UID >= 1000. This is the
+  # standard range for regular users on most systems.
+  local user
+  user=$(awk -F: '($3 >= 1000) && ($1 != "nobody") {print $1; exit}' /etc/passwd)
+  if [ -n "$user" ]; then
+    echo "$user"
+    return 0
+  fi
+  return 1
+}
+
+GUI_USER=$(find_gui_user)
+if [ -z "$GUI_USER" ]; then
+  print_error "Could not determine a non-root user. Please run the script with a specific user, e.g., 'sudo -u pi bash'."
+fi
+
 HOME_DIR="$(eval echo "~$GUI_USER")"
 DEFAULT_APP_DIR="$HOME_DIR/AutodartsTouch" # Default for new installs
 AUTOSTART_DESKTOP_DIR="$HOME_DIR/.config/autostart"
@@ -438,4 +460,4 @@ print_info "To start the application manually now, you can run:"
 echo "  bash $START_SCRIPT"
 echo
 print_warning "A reboot is recommended to apply all changes."
-echo
+echo 
