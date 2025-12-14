@@ -1,6 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
+
 # ===================================================================================
 # AUTODARTS TOUCH INSTALLATION SCRIPT
 #
@@ -140,7 +141,7 @@ find_gui_user() {
   return 1
 }
 
-GUI_USER=$(find_gui_user || true)
+GUI_USER=$(find_gui_user)
 if [ -z "$GUI_USER" ]; then
   print_error "Could not determine a non-root user. Please run the script with a specific user, e.g., 'sudo -u pi bash'."
 fi
@@ -151,12 +152,12 @@ AUTOSTART_DESKTOP_DIR="$HOME_DIR/.config/autostart"
 DESKTOP_FILE="$AUTOSTART_DESKTOP_DIR/AutodartsTouch.desktop"
 
 # Discover the application directory. If found, use it. Otherwise, use the default.
-APP_DIR=$(discover_app_dir "$DESKTOP_FILE")
-if [ -z "$APP_DIR" ]; then
+if discovered_dir=$(discover_app_dir "$DESKTOP_FILE"); then
+    print_success "Found existing installation at: $discovered_dir"
+    APP_DIR="$discovered_dir"
+else
     print_info "No existing installation found. Using default path: $DEFAULT_APP_DIR"
     APP_DIR="$DEFAULT_APP_DIR"
-else
-    print_success "Found existing installation at: $APP_DIR"
 fi
 
 START_SCRIPT="$APP_DIR/AutodartsTouch.sh"
