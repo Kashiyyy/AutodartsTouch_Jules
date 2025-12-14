@@ -1,16 +1,6 @@
 #!/bin/bash
 set -euo pipefail
 
-# --- Error Handling
-# This trap will be executed when a command fails. It prints the line number
-# and the command that failed, which is invaluable for debugging silent exits.
-handle_error() {
-  local exit_code=$?
-  local line_number=$1
-  local command=$2
-  echo "ERROR: Command '$command' failed on line $line_number with exit code $exit_code." >&2
-}
-trap 'handle_error $LINENO "$BASH_COMMAND"' ERR
 
 # ===================================================================================
 # AUTODARTS TOUCH INSTALLATION SCRIPT
@@ -162,12 +152,12 @@ AUTOSTART_DESKTOP_DIR="$HOME_DIR/.config/autostart"
 DESKTOP_FILE="$AUTOSTART_DESKTOP_DIR/AutodartsTouch.desktop"
 
 # Discover the application directory. If found, use it. Otherwise, use the default.
-APP_DIR=$(discover_app_dir "$DESKTOP_FILE")
-if [ -z "$APP_DIR" ]; then
+if discovered_dir=$(discover_app_dir "$DESKTOP_FILE"); then
+    print_success "Found existing installation at: $discovered_dir"
+    APP_DIR="$discovered_dir"
+else
     print_info "No existing installation found. Using default path: $DEFAULT_APP_DIR"
     APP_DIR="$DEFAULT_APP_DIR"
-else
-    print_success "Found existing installation at: $APP_DIR"
 fi
 
 START_SCRIPT="$APP_DIR/AutodartsTouch.sh"
