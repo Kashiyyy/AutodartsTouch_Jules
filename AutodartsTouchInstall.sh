@@ -403,6 +403,30 @@ if [ -d "$BACKUP_DIR" ]; then
 fi
 
 
+# --- Step 5.5: System Diagnostics ---
+print_header "Step 5.5: Running System Diagnostics"
+DIAG_LOG_FILE="/tmp/system_diagnostics.log"
+print_info "Saving system diagnostics to $DIAG_LOG_FILE"
+{
+  echo "--- System Information ---"
+  echo "Date: $(date)"
+  echo "Kernel: $(uname -a)"
+  echo "Architecture: $(dpkg --print-architecture)"
+  echo
+  echo "--- Node.js Information ---"
+  echo "Node version: $(node --version)"
+  echo "npm version: $(npm --version)"
+  echo "npm config list:"
+  npm config list
+  echo
+  echo "--- Network Information ---"
+  echo "Pinging registry.npmjs.org..."
+  ping -c 3 registry.npmjs.org
+  echo
+  echo "--- End of Diagnostics ---"
+} > "$DIAG_LOG_FILE" 2>&1
+print_success "System diagnostics saved."
+
 # --- Step 6: Install Node.js Dependencies
 print_header "Step 6: Installing Application Dependencies"
 NPM_LOG_FILE="/tmp/npm_install.log"
