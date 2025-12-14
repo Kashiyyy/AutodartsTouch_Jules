@@ -1,6 +1,17 @@
 #!/bin/bash
 set -euo pipefail
 
+# --- Error Handling
+# This trap will be executed when a command fails. It prints the line number
+# and the command that failed, which is invaluable for debugging silent exits.
+handle_error() {
+  local exit_code=$?
+  local line_number=$1
+  local command=$2
+  echo "ERROR: Command '$command' failed on line $line_number with exit code $exit_code." >&2
+}
+trap 'handle_error $LINENO "$BASH_COMMAND"' ERR
+
 # ===================================================================================
 # AUTODARTS TOUCH INSTALLATION SCRIPT
 #
@@ -140,7 +151,7 @@ find_gui_user() {
   return 1
 }
 
-GUI_USER=$(find_gui_user || true)
+GUI_USER=$(find_gui_user)
 if [ -z "$GUI_USER" ]; then
   print_error "Could not determine a non-root user. Please run the script with a specific user, e.g., 'sudo -u pi bash'."
 fi
