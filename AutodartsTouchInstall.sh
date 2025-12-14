@@ -406,12 +406,21 @@ fi
 # --- Step 6: Install Node.js Dependencies
 print_header "Step 6: Installing Application Dependencies"
 NPM_LOG_FILE="/tmp/npm_install.log"
-print_info "Running 'npm install'. This might take a moment..."
+print_info "Forcing a clean installation of npm dependencies..."
 print_info "A detailed log will be saved to $NPM_LOG_FILE"
 
-# Run npm install with verbose logging and capture its output
-if sudo -u "$GUI_USER" bash -c "cd '$APP_DIR' && npm install --omit=dev --verbose > '$NPM_LOG_FILE' 2>&1"; then
-  print_success "Application dependencies installed."
+# Force a clean install by clearing the cache and removing old modules.
+# This is a more aggressive approach to fix stubborn installation issues.
+CLEAN_INSTALL_COMMAND="
+  echo '--- Cleaning up previous installation ---'
+  npm cache clean --force
+  rm -rf node_modules package-lock.json
+  echo '--- Starting clean npm install ---'
+  npm install --omit=dev --verbose
+"
+
+if sudo -u "$GUI_USER" bash -c "cd '$APP_DIR' && $CLEAN_INSTALL_COMMAND" > "$NPM_LOG_FILE" 2>&1; then
+  print_success "Application dependencies installed successfully."
 else
   print_error "Failed to install npm dependencies. Please check the log at $NPM_LOG_FILE for details."
 fi
