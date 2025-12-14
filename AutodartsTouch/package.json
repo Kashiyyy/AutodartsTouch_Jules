@@ -16,6 +16,6 @@
     "semver": "^7.6.3",
     "simple-keyboard": "^3.8.83",
     "unzipper": "^0.12.2",
-    "electron": "^38.1.2"
+    "electron": "^28.2.0"
   }
 }
