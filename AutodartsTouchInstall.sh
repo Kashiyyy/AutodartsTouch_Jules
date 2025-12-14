@@ -460,4 +460,4 @@ print_info "To start the application manually now, you can run:"
 echo "  bash $START_SCRIPT"
 echo
 print_warning "A reboot is recommended to apply all changes."
-echo 
+echo
