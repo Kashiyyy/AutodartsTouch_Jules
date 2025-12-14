@@ -406,20 +406,28 @@ fi
 # --- Step 6: Install Node.js Dependencies
 print_header "Step 6: Installing Application Dependencies"
 NPM_LOG_FILE="/tmp/npm_install.log"
-print_info "Forcing a clean installation of npm dependencies..."
+print_info "Forcing a clean, isolated installation of npm dependencies..."
 print_info "A detailed log will be saved to $NPM_LOG_FILE"
 
-# Force a clean install by clearing the cache and removing old modules.
-# This is a more aggressive approach to fix stubborn installation issues.
-CLEAN_INSTALL_COMMAND="
+# This is a very aggressive approach to isolate the problematic package.
+# 1. Clean everything.
+# 2. Try to install ONLY Electron.
+# 3. Try to install the rest.
+ISOLATED_INSTALL_COMMAND="
+  set -x
   echo '--- Cleaning up previous installation ---'
   npm cache clean --force
   rm -rf node_modules package-lock.json
-  echo '--- Starting clean npm install ---'
+  
+  echo '--- Attempting to install ONLY Electron ---'
+  npm install electron@^28.2.0 --omit=dev --verbose
+
+  echo '--- Attempting to install remaining dependencies ---'
   npm install --omit=dev --verbose
+  set +x
 "
 
-if sudo -u "$GUI_USER" bash -c "cd '$APP_DIR' && $CLEAN_INSTALL_COMMAND" > "$NPM_LOG_FILE" 2>&1; then
+if sudo -u "$GUI_USER" bash -c "cd '$APP_DIR' && $ISOLATED_INSTALL_COMMAND" > "$NPM_LOG_FILE" 2>&1; then
   print_success "Application dependencies installed successfully."
 else
   print_error "Failed to install npm dependencies. Please check the log at $NPM_LOG_FILE for details."
