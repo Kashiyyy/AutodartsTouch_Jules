@@ -140,7 +140,7 @@ find_gui_user() {
   return 1
 }
 
-GUI_USER=$(find_gui_user)
+GUI_USER=$(find_gui_user || true)
 if [ -z "$GUI_USER" ]; then
   print_error "Could not determine a non-root user. Please run the script with a specific user, e.g., 'sudo -u pi bash'."
 fi
