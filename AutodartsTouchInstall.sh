@@ -405,11 +405,26 @@ fi
 
 # --- Step 6: Install Node.js Dependencies
 print_header "Step 6: Installing Application Dependencies"
+NPM_LOG_FILE="/tmp/npm_install.log"
 print_info "Running 'npm install'. This might take a moment..."
-if sudo -u "$GUI_USER" bash -c "cd '$APP_DIR' && npm install --omit=dev"; then
+print_info "A detailed log will be saved to $NPM_LOG_FILE"
+
+# Run npm install with verbose logging and capture its output
+if sudo -u "$GUI_USER" bash -c "cd '$APP_DIR' && npm install --omit=dev --verbose > '$NPM_LOG_FILE' 2>&1"; then
   print_success "Application dependencies installed."
 else
-  print_error "Failed to install npm dependencies. Please check the logs."
+  print_error "Failed to install npm dependencies. Please check the log at $NPM_LOG_FILE for details."
+fi
+
+# --- Verification Step ---
+print_header "Verifying Electron Installation"
+ELECTRON_PATH="$APP_DIR/node_modules/.bin/electron"
+if [ -f "$ELECTRON_PATH" ]; then
+    print_success "Electron executable found at $ELECTRON_PATH"
+else
+    print_warning "CRITICAL: Electron executable was NOT found after installation."
+    print_warning "Please check the log at $NPM_LOG_FILE to understand why it failed."
+    # We don't exit here, to allow the user to get the logs.
 fi
 
 # --- Step 7: Storing Version Information
