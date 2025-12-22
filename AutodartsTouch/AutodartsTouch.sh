@@ -8,5 +8,6 @@ export XAUTHORITY="$HOME/.Xauthority"
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 cd "$SCRIPT_DIR" || exit 1
 
-# Start electron as GUI user (npx uses local node_modules)
-exec /usr/bin/env npx electron . --disable-gpu --no-sandbox
+# Start Electron by calling the executable directly from the local node_modules.
+# This is more robust than using 'npx' and avoids path resolution issues.
+exec ./node_modules/.bin/electron . --disable-gpu --no-sandbox
