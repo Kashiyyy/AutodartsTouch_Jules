@@ -429,6 +429,13 @@ print_success "System diagnostics saved."
 
 # --- Step 6: Install Node.js Dependencies
 print_header "Step 6: Installing Application Dependencies"
+
+print_info "Removing potentially conflicting node_modules from home directory..."
+if [ -d "$HOME_DIR/node_modules" ]; then
+    rm -rf "$HOME_DIR/node_modules"
+    print_success "Removed stale node_modules from $HOME_DIR."
+fi
+
 NPM_LOG_FILE="/tmp/npm_install.log"
 print_info "Forcing a clean, isolated installation of npm dependencies..."
 print_info "A detailed log will be saved to $NPM_LOG_FILE"
