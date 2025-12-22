@@ -529,6 +529,7 @@ function setupAutoKeyboard() {
 
 // This is the main entry point.
 app.whenReady().then(async () => {
+  app.disableHardwareAcceleration();
   // Initialize paths now that app is ready
   const extensionName = GITHUB_REPO.split('/')[1];
   EXTENSION_DIR = path.join(__dirname, 'extensions', extensionName);
