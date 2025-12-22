@@ -282,7 +282,27 @@ function createDynamicViews() {
       applyGlobalCss(view);
       mainWindow.addBrowserView(view);
       views[`tab${index}`] = view;
-      loadingPromises.push(view.webContents.loadURL(tab.url).catch(e => console.error(`tab${index} load error:`, e)));
+      loadingPromises.push(view.webContents.loadURL(tab.url).catch(e => {
+        console.error(`tab${index} load error:`, e);
+        // Display an error page in the BrowserView on failure
+        const errorPage = `data:text/html,
+          <style>
+            body {
+              background-color: #111; color: #eee; font-family: sans-serif;
+              display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0;
+            }
+            .container { text-align: center; }
+            h1 { color: #ff6b6b; }
+            p { font-size: 1.2em; }
+            code { background-color: #333; padding: 2px 5px; border-radius: 3px; }
+          </style>
+          <div class="container">
+            <h1>Connection Error</h1>
+            <p>Could not connect to <code>${tab.url}</code></p>
+            <p>Please check if the service is running.</p>
+          </div>`;
+        view.webContents.loadURL(errorPage);
+      }));
     }
   });
 
