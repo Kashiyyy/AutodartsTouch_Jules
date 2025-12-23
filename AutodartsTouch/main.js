@@ -1,4 +1,8 @@
 const { app, BrowserWindow, BrowserView, ipcMain, screen, session, shell, dialog } = require('electron');
+
+// Disable hardware acceleration to prevent black screen issues, must be called before app is ready.
+app.disableHardwareAcceleration();
+
 const path = require('path');
 const fs = require('fs');
 const https = require('https');
@@ -529,7 +533,6 @@ function setupAutoKeyboard() {
 
 // This is the main entry point.
 app.whenReady().then(async () => {
-  app.disableHardwareAcceleration();
   // Initialize paths now that app is ready
   const extensionName = GITHUB_REPO.split('/')[1];
   EXTENSION_DIR = path.join(__dirname, 'extensions', extensionName);
