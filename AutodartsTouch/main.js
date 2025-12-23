@@ -1,4 +1,8 @@
 const { app, BrowserWindow, BrowserView, ipcMain, screen, session, shell, dialog } = require('electron');
+
+// Disable hardware acceleration to prevent black screen issues, must be called before app is ready.
+app.disableHardwareAcceleration();
+
 const path = require('path');
 const fs = require('fs');
 const https = require('https');
