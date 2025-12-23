@@ -1,4 +1,8 @@
 const { app, BrowserWindow, BrowserView, ipcMain, screen, session, shell, dialog } = require('electron');
+
+// Disable hardware acceleration to prevent black screen issues, must be called before app is ready.
+app.disableHardwareAcceleration();
+
 const path = require('path');
 const fs = require('fs');
 const https = require('https');
@@ -276,13 +280,21 @@ function createDynamicViews() {
     { name: 'Autodarts', url: 'https://play.autodarts.io/' },
     { name: 'Service', url: 'http://localhost:3180/' }
   ]);
+  const loadDelay = getSetting('loadDelay', 5000);
   tabs.forEach((tab, index) => {
     if (tab && tab.url && tab.url.trim() !== '') {
       const view = new BrowserView({ webPreferences: { contextIsolation: true, sandbox: false, preload: path.join(__dirname, 'preload.js') } });
       applyGlobalCss(view);
       mainWindow.addBrowserView(view);
       views[`tab${index}`] = view;
-      loadingPromises.push(view.webContents.loadURL(tab.url).catch(e => console.error(`tab${index} load error:`, e)));
+      const loadPromise = new Promise(resolve => {
+        setTimeout(() => {
+          view.webContents.loadURL(tab.url)
+            .catch(e => console.error(`tab${index} load error:`, e))
+            .finally(resolve);
+        }, loadDelay);
+      });
+      loadingPromises.push(loadPromise);
     }
   });
 
@@ -759,6 +771,7 @@ app.whenReady().then(async () => {
       toolbarHeight: getSetting('toolbar.height', 72),
       toolbarFontSize: getSetting('toolbar.fontSize', 24),
       enableExtension: store.get('enableExtension', false),
+      loadDelay: getSetting('loadDelay', 5000),
       tabs: store.get('tabs', [
         { name: 'Autodarts', url: 'https://play.autodarts.io/' },
         { name: 'Service', url: 'http://localhost:3180/' }
@@ -777,6 +790,7 @@ app.whenReady().then(async () => {
     store.set('toolbar.fontSize', settings.toolbarFontSize);
     store.set('tabs', settings.tabs);
     store.set('enableExtension', settings.enableExtension);
+    store.set('loadDelay', settings.loadDelay);
 
     if (oldEnableExtension !== settings.enableExtension) {
       if (settings.enableExtension) {

@@ -216,6 +216,12 @@
           <select id="keyboardLayout"></select>
         </div>
       </div>
+      <div class="setting-row">
+        <div class="setting">
+            <label for="loadDelay">Page Load Delay (ms): <span id="loadDelayValue">5000</span></label>
+            <input type="range" id="loadDelay" min="0" max="15000" step="500" value="5000">
+        </div>
+      </div>
     </div>
 
     <div class="settings-section">
@@ -316,6 +322,7 @@
     const keyboardLayoutSelect = document.getElementById('keyboardLayout');
     const toolbarHeightSlider = document.getElementById('toolbarHeight');
     const toolbarFontSizeSlider = document.getElementById('toolbarFontSize');
+    const loadDelaySlider = document.getElementById('loadDelay');
     const saveBtn = document.getElementById('saveBtn');
     const closeBtn = document.getElementById('closeBtn');
     const resetBtn = document.getElementById('resetBtn');
@@ -582,10 +589,12 @@
           keyboardLayoutSelect.value = settings.keyboardLayout || 'qwertz';
           toolbarHeightSlider.value = settings.toolbarHeight || 72;
           toolbarFontSizeSlider.value = settings.toolbarFontSize || 24;
+          loadDelaySlider.value = settings.loadDelay || 5000;
           enableExtensionCheckbox.checked = settings.enableExtension || false;
 
           // Update display values
           updateSliderValue(volumeSlider, volumeValue);
+          updateSliderValue(loadDelaySlider, loadDelayValue);
           updateSliderValue(toolbarHeightSlider, toolbarHeightValue);
           updateSliderValue(keyboardWidthSlider, keyboardWidthValue);
           updateSliderValue(keyHeightSlider, keyHeightValue);
@@ -615,6 +624,7 @@
     const toolbarFontSizeValue = document.getElementById('toolbarFontSizeValue');
     const keyboardWidthValue = document.getElementById('keyboardWidthValue');
     const keyHeightValue = document.getElementById('keyHeightValue');
+    const loadDelayValue = document.getElementById('loadDelayValue');
 
     function updateSliderValue(slider, display) {
       display.textContent = slider.value;
@@ -649,6 +659,8 @@
         updateSliderValue(keyHeightSlider, keyHeightValue);
         sendLiveUpdate();
     });
+
+    loadDelaySlider.addEventListener('input', () => updateSliderValue(loadDelaySlider, loadDelayValue));
 
     keyboardLayoutSelect.addEventListener('change', sendLiveUpdate);
 
@@ -702,6 +714,7 @@
         keyboardLayout: keyboardLayoutSelect.value,
         toolbarHeight: parseInt(toolbarHeightSlider.value, 10),
         toolbarFontSize: parseInt(toolbarFontSizeSlider.value, 10),
+        loadDelay: parseInt(loadDelaySlider.value, 10),
         tabs: tabs,
         enableExtension: enableExtensionCheckbox.checked,
       };
