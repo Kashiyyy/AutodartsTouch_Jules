@@ -247,15 +247,18 @@ print_header "Step 2: Installing System Dependencies"
 declare -a packages
 case "$PACKAGE_MANAGER" in
   apt)
-    packages=("curl" "git" "unzip" "build-essential" "alsa-utils" "zenity")
+    # fonts-noto-color-emoji provides broad emoji support.
+    packages=("curl" "git" "unzip" "build-essential" "alsa-utils" "zenity" "fonts-noto-color-emoji")
     ;;
   dnf|yum)
-    # For Fedora/CentOS, 'Development Tools' group is equivalent to build-essential
-    packages=("curl" "git" "unzip" "@development-tools" "alsa-utils" "zenity")
+    # For Fedora/CentOS, 'Development Tools' group is equivalent to build-essential.
+    # google-noto-emoji-fonts is the package name for Noto Color Emoji.
+    packages=("curl" "git" "unzip" "@development-tools" "alsa-utils" "zenity" "google-noto-emoji-fonts")
     ;;
   pacman)
-    # For Arch, base-devel group is equivalent to build-essential
-    packages=("curl" "git" "unzip" "base-devel" "alsa-utils" "zenity")
+    # For Arch, base-devel group is equivalent to build-essential.
+    # noto-fonts-emoji is the package name for Noto Color Emoji.
+    packages=("curl" "git" "unzip" "base-devel" "alsa-utils" "zenity" "noto-fonts-emoji")
     ;;
   *)
     print_error "Package name translation not configured for $PACKAGE_MANAGER."
